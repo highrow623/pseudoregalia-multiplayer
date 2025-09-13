@@ -119,16 +119,44 @@ impl State {
             if self.skip_index(index, other) {
                 continue;
             }
-            let last = &self.info[index][other];
-            let real = &self.info[other][other];
+
+            // fairly nasty, but this lets us update only the fields in last that need to be updated
+            // while creating the update, which saves us from unnecessarily cloning zone (String)
+            let max = std::cmp::max(index, other);
+            let (left, right) = self.info.split_at_mut(max);
+            let (last, real) = if max == other {
+                (&mut left[index][other], &right[0][other])
+            } else {
+                // max == index
+                (&mut right[0][other], &left[other][other])
+            };
             let update = PlayerInfo {
-                zo: if last.zo != real.zo { real.zo.clone() } else { None },
-                px: if last.px != real.px { real.px.clone() } else { None },
-                py: if last.py != real.py { real.py.clone() } else { None },
-                pz: if last.pz != real.pz { real.pz.clone() } else { None },
+                zo: if last.zo != real.zo {
+                    last.zo = real.zo.clone();
+                    real.zo.clone()
+                } else {
+                    None
+                },
+                px: if last.px != real.px {
+                    last.px = real.px;
+                    real.px
+                } else {
+                    None
+                },
+                py: if last.py != real.py {
+                    last.py = real.py;
+                    real.py
+                } else {
+                    None
+                },
+                pz: if last.pz != real.pz {
+                    last.pz = real.pz;
+                    real.pz
+                } else {
+                    None
+                },
             };
             updates.insert(other, update);
-            self.info[index][other] = real.clone();
         }
         updates
     }
