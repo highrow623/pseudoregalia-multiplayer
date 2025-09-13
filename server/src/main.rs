@@ -6,7 +6,10 @@ use std::{
 
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::{
+    net::{TcpListener, TcpStream},
+    sync::mpsc::error::TrySendError,
+};
 
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Default, Deserialize, Serialize)]
@@ -120,8 +123,8 @@ impl State {
                 continue;
             }
 
-            // fairly nasty, but this lets us update only the fields in last that need to be updated
-            // while creating the update, which saves us from unnecessarily cloning zone (String)
+            // Fairly nasty, but this lets us update only the fields in last that need to be updated
+            // while creating the update, which saves us from unnecessarily cloning zone, a String.
             let max = std::cmp::max(index, other);
             let (left, right) = self.info[other].split_at_mut(max);
             let (last, real) = if max == other {
@@ -173,17 +176,42 @@ impl State {
 async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, addr: SocketAddr) {
     println!("{addr}: incoming TCP connection");
 
-    let mut ws_stream = tokio_tungstenite::accept_async(raw_stream)
+    let ws_stream = tokio_tungstenite::accept_async(raw_stream)
         .await
         .expect(format!("{addr}: error during the websocket handshake occured").as_str());
     println!("{addr}: established WebSocket connection");
+    let (mut write, mut read) = ws_stream.split();
 
-    // the index into state for this player
-    // a value of None indicates the player hasn't sent an initial message
-    let mut index: Option<usize> = None;
+    // Used by main thread to tell write thread when an update is ready to send, sends copy of index
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1);
 
-    while let Some(msg) = ws_stream.next().await {
-        // validate message
+    // Spawn write thread
+    {
+        let state = state.clone();
+        tokio::spawn(async move {
+            while let Some(index) = rx.recv().await {
+                let updates = state.lock().unwrap().gen_updates(index);
+                let msg = match serde_json::to_string(&updates) {
+                    Ok(msg) => msg,
+                    Err(err) => {
+                        println!("{addr}: failed to serialize updates: {err}");
+                        break;
+                    }
+                };
+                if let Err(err) = write.send(msg.into()).await {
+                    println!("{addr}: failed to send updates: {err}");
+                    break;
+                }
+            }
+        });
+    }
+
+    // The index into state for this player. A value of None indicates the player hasn't sent an
+    // initial message.
+    let mut index = None;
+
+    while let Some(msg) = read.next().await {
+        // Validate message
         let msg = match msg {
             Ok(msg) => msg,
             Err(err) => {
@@ -199,7 +227,7 @@ async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, addr
             continue;
         }
 
-        // parse message
+        // Parse message
         let msg = match msg.to_text() {
             Ok(s) => s,
             Err(err) => {
@@ -215,40 +243,34 @@ async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, addr
             }
         };
 
-        // update state
+        // Update state
         if let Some(index) = index {
             state.lock().unwrap().update(index, info);
         } else {
             index = match state.lock().unwrap().insert(info) {
-                Ok(i) => Some(i),
+                Ok(index) => Some(index),
                 Err(err) => {
                     println!("{addr}: failed to insert: {err}");
                     break;
                 }
-            }
+            };
         }
 
-        // send updates
-        // at this point index is guaranteed to be Some, so we can just unwrap
-        let updates = state.lock().unwrap().gen_updates(index.unwrap());
-        let msg = match serde_json::to_string(&updates) {
-            Ok(s) => s,
-            Err(err) => {
-                println!("{addr}: failed to serialize updates: {err}");
-                break;
-            }
-        };
-        // TODO check performance, may have to put send in a separate thread
-        // could feed here and flush in separate thread? or share queue of messages and send_all
-        // in separate thread?
-        if let Err(err) = ws_stream.send(msg.into()).await {
-            println!("{addr}: failed to send updates: {err}");
+        // Inform write thread to send.
+        // At this point index is guaranteed to be Some, so we can just unwrap.
+        if let Err(err) = tx.try_send(index.unwrap())
+            && let TrySendError::Closed(_) = err
+        {
+            // We don't care if the channel is at capacity because that just means we've already
+            // queued an update. But a Closed error means the write thread has dropped rx, and so
+            // messages can no longer be sent.
+            println!("{addr}: write thread has closed");
             break;
         }
     }
     println!("{addr}: disconnected");
 
-    // cleanup
+    // Cleanup
     if let Some(index) = index {
         state.lock().unwrap().remove(index);
     }
