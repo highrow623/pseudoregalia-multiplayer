@@ -180,37 +180,35 @@ async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, addr
         .await
         .expect(format!("{addr}: error during the websocket handshake occured").as_str());
     println!("{addr}: established WebSocket connection");
-    let (mut write, mut read) = ws_stream.split();
+    let (mut ws_write, mut ws_read) = ws_stream.split();
 
     // Used by main thread to tell write thread when an update is ready to send, sends copy of index
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
 
     // Spawn write thread
-    {
-        let state = state.clone();
-        tokio::spawn(async move {
-            while let Some(index) = rx.recv().await {
-                let updates = state.lock().unwrap().gen_updates(index);
-                let msg = match serde_json::to_string(&updates) {
-                    Ok(msg) => msg,
-                    Err(err) => {
-                        println!("{addr}: failed to serialize updates: {err}");
-                        break;
-                    }
-                };
-                if let Err(err) = write.send(msg.into()).await {
-                    println!("{addr}: failed to send updates: {err}");
+    let state2 = state.clone();
+    let join = tokio::spawn(async move {
+        while let Some(index) = rx.recv().await {
+            let updates = state2.lock().unwrap().gen_updates(index);
+            let msg = match serde_json::to_string(&updates) {
+                Ok(msg) => msg,
+                Err(err) => {
+                    println!("{addr}: failed to serialize updates: {err}");
                     break;
                 }
+            };
+            if let Err(err) = ws_write.send(msg.into()).await {
+                println!("{addr}: failed to send updates: {err}");
+                break;
             }
-        });
-    }
+        }
+    });
 
     // The index into state for this player. A value of None indicates the player hasn't sent an
     // initial message.
     let mut index = None;
 
-    while let Some(msg) = read.next().await {
+    while let Some(msg) = ws_read.next().await {
         // Validate message
         let msg = match msg {
             Ok(msg) => msg,
@@ -256,24 +254,26 @@ async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, addr
             };
         }
 
-        // Inform write thread to send.
-        // At this point index is guaranteed to be Some, so we can just unwrap.
+        // Inform write thread to send update.
+        // After updating state, index is guaranteed to be Some, so we can just unwrap.
         if let Err(err) = tx.try_send(index.unwrap())
             && let TrySendError::Closed(_) = err
         {
-            // We don't care if the channel is at capacity because that just means we've already
-            // queued an update. But a Closed error means the write thread has dropped rx, and so
-            // messages can no longer be sent.
-            println!("{addr}: write thread has closed");
+            // We don't care about a Full error because that just means we've already queued an
+            // update. But a Closed error means the write thread has dropped rx and is therefore no
+            // longer running.
+            println!("{addr}: write thread has stopped running");
             break;
         }
     }
-    println!("{addr}: disconnected");
 
     // Cleanup
+    drop(tx);
+    let _ = join.await;
     if let Some(index) = index {
         state.lock().unwrap().remove(index);
     }
+    println!("{addr}: disconnected");
 }
 
 #[tokio::main]
