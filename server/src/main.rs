@@ -30,7 +30,7 @@ impl PlayerInfo {
 struct State {
     /// A square vector.
     /// `info[index][index]` contains the "real" info for the player at `index`.
-    /// `info[index][other]` contains the "last" version of `other`'s info that was sent to `index`.
+    /// `info[other][index]` contains the "last" version of `other`'s info that was sent to `index`.
     info: Vec<Vec<PlayerInfo>>,
     /// The indexes into `info` that should be skipped, representing players who have disconnected.
     /// These indexes will be recycled on connection if available. Otherwise, `info` will grow.
@@ -71,7 +71,7 @@ impl State {
             self.skip.remove(&index);
 
             for other in 0..self.info.len() {
-                if self.skip_index(index, other) {
+                if self.skip_other(index, other) {
                     continue;
                 }
                 self.info[other][index] = PlayerInfo::default();
@@ -116,19 +116,19 @@ impl State {
         assert!(self.valid_index(index));
         let mut updates = HashMap::new();
         for other in 0..self.info.len() {
-            if self.skip_index(index, other) {
+            if self.skip_other(index, other) {
                 continue;
             }
 
             // fairly nasty, but this lets us update only the fields in last that need to be updated
             // while creating the update, which saves us from unnecessarily cloning zone (String)
             let max = std::cmp::max(index, other);
-            let (left, right) = self.info.split_at_mut(max);
+            let (left, right) = self.info[other].split_at_mut(max);
             let (last, real) = if max == other {
-                (&mut left[index][other], &right[0][other])
+                (&mut left[index], &right[0])
             } else {
                 // max == index
-                (&mut right[0][other], &left[other][other])
+                (&mut right[0], &left[other])
             };
             let update = PlayerInfo {
                 zo: if last.zo != real.zo {
@@ -165,18 +165,18 @@ impl State {
         index < self.info.len() && !self.skip.contains(&index)
     }
 
-    fn skip_index(&self, index: usize, other: usize) -> bool {
+    fn skip_other(&self, index: usize, other: usize) -> bool {
         index == other || self.skip.contains(&other)
     }
 }
 
 async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, addr: SocketAddr) {
-    println!("{}: incoming TCP connection", addr);
+    println!("{addr}: incoming TCP connection");
 
     let mut ws_stream = tokio_tungstenite::accept_async(raw_stream)
         .await
-        .expect("Error during the websocket handshake occured");
-    println!("{}: WebSocket connection established", addr);
+        .expect(format!("{addr}: error during the websocket handshake occured").as_str());
+    println!("{addr}: established WebSocket connection");
 
     // the index into state for this player
     // a value of None indicates the player hasn't sent an initial message
@@ -187,12 +187,12 @@ async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, addr
         let msg = match msg {
             Ok(msg) => msg,
             Err(err) => {
-                println!("{}: failed to get next: {}", addr, err);
+                println!("{addr}: failed to get next: {err}");
                 break;
             }
         };
         if msg.is_close() {
-            println!("{}: received close message", addr);
+            println!("{addr}: received close message");
             break;
         }
         if !msg.is_text() && !msg.is_binary() {
@@ -203,14 +203,14 @@ async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, addr
         let msg = match msg.to_text() {
             Ok(s) => s,
             Err(err) => {
-                println!("{}: failed to cast message to text: {}", addr, err);
+                println!("{addr}: failed to cast message to text: {err}");
                 break;
             }
         };
         let info = match serde_json::from_str(msg) {
             Ok(info) => info,
             Err(err) => {
-                println!("{}: failed to parse message: {}", addr, err);
+                println!("{addr}: failed to deserialize message: {err}");
                 break;
             }
         };
@@ -222,7 +222,7 @@ async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, addr
             index = match state.lock().unwrap().insert(info) {
                 Ok(i) => Some(i),
                 Err(err) => {
-                    println!("{}: failed to insert: {}", addr, err);
+                    println!("{addr}: failed to insert: {err}");
                     break;
                 }
             }
@@ -234,16 +234,19 @@ async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, addr
         let msg = match serde_json::to_string(&updates) {
             Ok(s) => s,
             Err(err) => {
-                println!("{}: failed to serialize updates: {}", addr, err);
+                println!("{addr}: failed to serialize updates: {err}");
                 break;
             }
         };
+        // TODO check performance, may have to put send in a separate thread
+        // could feed here and flush in separate thread? or share queue of messages and send_all
+        // in separate thread?
         if let Err(err) = ws_stream.send(msg.into()).await {
-            println!("{}: failed to send updates: {}", addr, err);
+            println!("{addr}: failed to send updates: {err}");
             break;
         }
     }
-    println!("{}: disconnected", addr);
+    println!("{addr}: disconnected");
 
     // cleanup
     if let Some(index) = index {
@@ -256,7 +259,7 @@ async fn main() {
     // TODO read addr from env args
     let addr = String::from("127.0.0.1:8080");
     let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
-    println!("Server started, listening on {}", addr);
+    println!("Server started, listening on {addr}");
 
     let state = Arc::new(Mutex::new(State::new()));
     while let Ok((stream, addr)) = listener.accept().await {
