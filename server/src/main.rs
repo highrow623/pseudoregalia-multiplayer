@@ -55,8 +55,12 @@ impl State {
     fn insert(&mut self, info: PlayerInfo) -> Result<usize, String> {
         if info.has_none() {
             Err(String::from("tried to insert info that wasn't fully defined"))
+        } else if self.info.is_empty() {
+            // Initial insert
+            self.info.push(vec![info]);
+            Ok(0)
         } else if self.skip.is_empty() {
-            // no values to recycle from skip, so the new index goes at the end of info
+            // No values to recycle from skip, so the new index goes at the end of info
             let index = self.info.len();
 
             for other in 0..index {
@@ -69,7 +73,7 @@ impl State {
 
             Ok(index)
         } else {
-            // recycle any value from skip
+            // Recycle any value from skip
             let index = self.skip.iter().next().unwrap().clone();
             self.skip.remove(&index);
 
