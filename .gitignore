@@ -1,6 +1,6 @@
 /client/Output
 
-# unreal auto generates these two Content folders, we can ignore them until the actually get used
+# unreal auto generates these Content folders, we can ignore them until they actually get used
 /client/pseudoregalia/Content/Collections
 /client/pseudoregalia/Content/Developers
 /client/pseudoregalia/Build
