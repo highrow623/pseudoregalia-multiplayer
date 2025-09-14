@@ -8,17 +8,17 @@ use serde::{Deserialize, Serialize};
 pub struct PlayerInfo {
     /// ZOne
     zo: Option<String>,
-    /// Position X
-    px: Option<i64>,
-    /// Position Y
-    py: Option<i64>,
-    /// Position Z
-    pz: Option<i64>,
+    /// Location X
+    lx: Option<i64>,
+    /// Location Y
+    ly: Option<i64>,
+    /// Location Z
+    lz: Option<i64>,
 }
 
 impl PlayerInfo {
     fn has_none(&self) -> bool {
-        self.zo.is_none() || self.px.is_none() || self.py.is_none() || self.pz.is_none()
+        self.zo.is_none() || self.lx.is_none() || self.ly.is_none() || self.lz.is_none()
     }
 }
 
@@ -98,14 +98,14 @@ impl State {
         if info.zo.is_some() {
             real.zo = info.zo;
         }
-        if info.px.is_some() {
-            real.px = info.px;
+        if info.lx.is_some() {
+            real.lx = info.lx;
         }
-        if info.py.is_some() {
-            real.py = info.py;
+        if info.ly.is_some() {
+            real.ly = info.ly;
         }
-        if info.pz.is_some() {
-            real.pz = info.pz;
+        if info.lz.is_some() {
+            real.lz = info.lz;
         }
     }
 
@@ -138,21 +138,21 @@ impl State {
                 } else {
                     None
                 },
-                px: if last.px != real.px {
-                    last.px = real.px;
-                    real.px
+                lx: if last.lx != real.lx {
+                    last.lx = real.lx;
+                    real.lx
                 } else {
                     None
                 },
-                py: if last.py != real.py {
-                    last.py = real.py;
-                    real.py
+                ly: if last.ly != real.ly {
+                    last.ly = real.ly;
+                    real.ly
                 } else {
                     None
                 },
-                pz: if last.pz != real.pz {
-                    last.pz = real.pz;
-                    real.pz
+                lz: if last.lz != real.lz {
+                    last.lz = real.lz;
+                    real.lz
                 } else {
                     None
                 },
