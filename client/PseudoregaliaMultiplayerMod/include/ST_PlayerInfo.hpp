@@ -1,6 +1,9 @@
 #ifndef UE4SS_SDK_ST_PlayerInfo_HPP
 #define UE4SS_SDK_ST_PlayerInfo_HPP
 
+#include "Unreal/FString.hpp"
+#include "Unreal/UnrealCoreStructs.hpp"
+
 struct FST_PlayerInfo
 {
     RC::Unreal::FString id_5_ACEE325C40A82A6010DF82BF448FD0B6;       // 0x0000 (size: 0x10)

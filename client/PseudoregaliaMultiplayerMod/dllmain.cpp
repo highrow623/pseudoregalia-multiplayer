@@ -3,10 +3,9 @@
 
 #include "Unreal/AActor.hpp"
 #include "Unreal/Hooks.hpp"
-#include "Unreal/TArray.hpp"
 #include "Unreal/UClass.hpp"
 
-#include "ST_PlayerInfo.hpp"
+#include "Client.hpp"
 
 class PseudoregaliaMultiplayerMod : public RC::CppUserModBase
 {
@@ -36,9 +35,7 @@ public:
         {
             if (actor->GetClassPrivate()->GetName() == L"BP_PM_Manager_C")
             {
-                // TODO handle connection based on level? if non-gameplay level, close connection if one exists; if
-                // gameplay level, establish connection if one doesn't exist
-                // Client::OnSceneLoad(actor->GetLevel()->GetName());
+                Client::OnSceneLoad(actor->GetLevel()->GetName());
 
                 if (!sync_items_hooked)
                 {
@@ -57,8 +54,7 @@ public:
 
     auto on_update() -> void override
     {
-        // TODO poll server and potentially send messages based on current player info
-        // Client::Tick();
+        Client::Tick();
     }
 
     static void nop(RC::Unreal::UnrealScriptFunctionCallableContext& context, void* customdata)
@@ -68,11 +64,9 @@ public:
     static void sync_info(RC::Unreal::UnrealScriptFunctionCallableContext& context, void* customdata)
     {
         auto& player_info = context.GetParams<FST_PlayerInfo>();
-        // TODO use player_info to set info for sending to server
-        // Client::SetPlayerInfo(player_info);
+        Client::SetPlayerInfo(player_info);
         RC::Unreal::TArray<FST_PlayerInfo> ghost_info{};
-        // TODO get ghost_info
-        // Client::GetGhostInfo(ghost_info);
+        Client::GetGhostInfo(ghost_info);
         context.SetReturnValue(ghost_info);
     }
 };
