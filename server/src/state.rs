@@ -1,6 +1,5 @@
-use std::collections::{HashMap, HashSet};
-
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
 /// The contents of messages passed to and from the server, containing data for a player.
 #[serde_with::skip_serializing_none]
