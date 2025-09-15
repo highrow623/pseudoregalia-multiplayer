@@ -57,10 +57,6 @@ public:
         Client::Tick();
     }
 
-    static void nop(RC::Unreal::UnrealScriptFunctionCallableContext& context, void* customdata)
-    {
-    }
-
     static void sync_player_info(RC::Unreal::UnrealScriptFunctionCallableContext& context, void* customdata)
     {
         auto& player_info = context.GetParams<FST_PlayerInfo>();
@@ -72,8 +68,7 @@ public:
         RC::Unreal::TArray<FST_PlayerInfo> ghost_info{};
         Client::GetGhostInfo(ghost_info);
 
-        // TODO couldn't get context.SetReturnValue to work after a bit of testing so I've resorted to just calling
-        // UpdateGhosts directly from here. I think I'd prefer to use SetReturnValue tho if I can figure that out.
+        // TODO if I can figure out setting return values, I'd rather do that than calling UpdateGhosts directly
         RC::Unreal::UFunction* update_ghosts = context.Context->GetFunctionByName(L"UpdateGhosts");
         if (!update_ghosts)
         {
