@@ -15,9 +15,56 @@ pub struct PlayerInfo {
     lz: Option<i64>,
 }
 
+/// helper for `PlayerInfo::update`
+macro_rules! update_field {
+    ($self:ident, $info:ident, $field:ident) => {
+        if $info.$field.is_some() {
+            $self.$field = $info.$field;
+        }
+    };
+}
+
+/// helper for `PlayerInfo::gen_update`
+macro_rules! gen_update_field {
+    ($self:ident, $real:ident, $field:ident) => {
+        if $self.$field != $real.$field {
+            $self.$field = $real.$field;
+            $real.$field
+        } else {
+            None
+        }
+    };
+    ($self:ident, $real:ident, clone $field:ident) => {
+        if $self.$field != $real.$field {
+            $self.$field = $real.$field.clone();
+            $real.$field.clone()
+        } else {
+            None
+        }
+    };
+}
+
 impl PlayerInfo {
     fn has_none(&self) -> bool {
         self.zo.is_none() || self.lx.is_none() || self.ly.is_none() || self.lz.is_none()
+    }
+
+    /// Updates each field in self if that field in info is Some
+    fn update(&mut self, info: Self) {
+        update_field!(self, info, zo);
+        update_field!(self, info, lx);
+        update_field!(self, info, ly);
+        update_field!(self, info, lz);
+    }
+
+    /// Updates self to match real and returns a copy that reports which fields were updated.
+    fn gen_update(&mut self, real: &Self) -> Self {
+        Self {
+            zo: gen_update_field!(self, real, clone zo),
+            lx: gen_update_field!(self, real, lx),
+            ly: gen_update_field!(self, real, ly),
+            lz: gen_update_field!(self, real, lz),
+        }
     }
 }
 
@@ -94,18 +141,7 @@ impl State {
     pub fn update(&mut self, index: usize, info: PlayerInfo) {
         assert!(self.valid_index(index));
         let real = &mut self.info[index][index];
-        if info.zo.is_some() {
-            real.zo = info.zo;
-        }
-        if info.lx.is_some() {
-            real.lx = info.lx;
-        }
-        if info.ly.is_some() {
-            real.ly = info.ly;
-        }
-        if info.lz.is_some() {
-            real.lz = info.lz;
-        }
+        real.update(info);
     }
 
     /// Generates a map of updates for the player at `index`. A particular field is only sent in the
@@ -130,32 +166,7 @@ impl State {
                 // max == index
                 (&mut right[0], &left[other])
             };
-            let update = PlayerInfo {
-                zo: if last.zo != real.zo {
-                    last.zo = real.zo.clone();
-                    real.zo.clone()
-                } else {
-                    None
-                },
-                lx: if last.lx != real.lx {
-                    last.lx = real.lx;
-                    real.lx
-                } else {
-                    None
-                },
-                ly: if last.ly != real.ly {
-                    last.ly = real.ly;
-                    real.ly
-                } else {
-                    None
-                },
-                lz: if last.lz != real.lz {
-                    last.lz = real.lz;
-                    real.lz
-                } else {
-                    None
-                },
-            };
+            let update = last.gen_update(real);
             updates.insert(other, update);
         }
         updates
