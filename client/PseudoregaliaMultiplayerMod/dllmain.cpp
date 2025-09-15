@@ -3,6 +3,7 @@
 #include "Unreal/AActor.hpp"
 #include "Unreal/Hooks.hpp"
 #include "Unreal/UClass.hpp"
+#include "Unreal/UFunction.hpp"
 
 #include "Client.hpp"
 #include "Logger.hpp"
@@ -43,7 +44,7 @@ public:
                         Log(L"Could not find function \"SyncInfo\" in \"BP_PM_Manager_C\"", LogType::Error);
                         return;
                     }
-                    RC::Unreal::UObjectGlobals::RegisterHook(func, sync_info, nop, nullptr);
+                    RC::Unreal::UObjectGlobals::RegisterHook(func, sync_player_info, sync_ghost_info, nullptr);
                     Log(L"Registered hook for \"SyncInfo\" in \"BP_PM_Manager_C\"", LogType::Loud);
                     sync_items_hooked = true;
                 }
@@ -60,13 +61,27 @@ public:
     {
     }
 
-    static void sync_info(RC::Unreal::UnrealScriptFunctionCallableContext& context, void* customdata)
+    static void sync_player_info(RC::Unreal::UnrealScriptFunctionCallableContext& context, void* customdata)
     {
         auto& player_info = context.GetParams<FST_PlayerInfo>();
         Client::SetPlayerInfo(player_info);
+    }
+
+    static void sync_ghost_info(RC::Unreal::UnrealScriptFunctionCallableContext& context, void* customdata)
+    {
         RC::Unreal::TArray<FST_PlayerInfo> ghost_info{};
         Client::GetGhostInfo(ghost_info);
-        context.SetReturnValue(ghost_info);
+
+        // TODO couldn't get context.SetReturnValue to work after a bit of testing so I've resorted to just calling
+        // UpdateGhosts directly from here. I think I'd prefer to use SetReturnValue tho if I can figure that out.
+        RC::Unreal::UFunction* update_ghosts = context.Context->GetFunctionByName(L"UpdateGhosts");
+        if (!update_ghosts)
+        {
+            Log(L"Could not find function \"UpdateGhosts\" in \"BP_PM_Manager_C\"", LogType::Error);
+            return;
+        }
+        std::shared_ptr<void> params = std::make_shared<RC::Unreal::TArray<FST_PlayerInfo>>(ghost_info);
+        context.Context->ProcessEvent(update_ghosts, params.get());
     }
 };
 
