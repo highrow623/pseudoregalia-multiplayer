@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <Mod/CppUserModBase.hpp>
 
 #include "Unreal/AActor.hpp"
@@ -6,6 +5,7 @@
 #include "Unreal/UClass.hpp"
 
 #include "Client.hpp"
+#include "Logger.hpp"
 
 class PseudoregaliaMultiplayerMod : public RC::CppUserModBase
 {
@@ -21,8 +21,6 @@ public:
         // Do not change this unless you want to target a UE4SS version
         // other than the one you're currently building with somehow.
         //ModIntendedSDKVersion = STR("2.6");
-        
-        printf("PseudoregaliaMultiplayerMod says hello\n");
     }
 
     ~PseudoregaliaMultiplayerMod() override
@@ -42,10 +40,11 @@ public:
                     RC::Unreal::UFunction* func = actor->GetFunctionByName(L"SyncInfo");
                     if (!func)
                     {
-                        // TODO log error
+                        Log(L"Could not find function \"SyncInfo\" in \"BP_PM_Manager_C\"", LogType::Error);
                         return;
                     }
                     RC::Unreal::UObjectGlobals::RegisterHook(func, sync_info, nop, nullptr);
+                    Log(L"Registered hook for \"SyncInfo\" in \"BP_PM_Manager_C\"", LogType::Loud);
                     sync_items_hooked = true;
                 }
             }
