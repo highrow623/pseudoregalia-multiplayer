@@ -1,9 +1,15 @@
 #include <stdio.h>
 #include <Mod/CppUserModBase.hpp>
 
+#include "Unreal/AActor.hpp"
+#include "Unreal/Hooks.hpp"
+#include "Unreal/UClass.hpp"
+
 class PseudoregaliaMultiplayerMod : public RC::CppUserModBase
 {
 public:
+    bool sync_items_hooked = false;
+
     PseudoregaliaMultiplayerMod() : CppUserModBase()
     {
         ModName = STR("PseudoregaliaMultiplayerMod");
@@ -21,8 +27,43 @@ public:
     {
     }
 
+    auto on_unreal_init() -> void override
+    {
+        RC::Unreal::Hook::RegisterBeginPlayPostCallback([&](RC::Unreal::AActor* actor)
+        {
+            if (actor->GetClassPrivate()->GetName() == L"BP_PM_Manager_C")
+            {
+                // TODO
+                // OnSceneLoad();
+
+                if (!sync_items_hooked)
+                {
+                    RC::Unreal::UFunction* func = actor->GetFunctionByName(L"SyncItems");
+                    if (!func)
+                    {
+                        // TODO log error
+                        return;
+                    }
+                    RC::Unreal::UObjectGlobals::RegisterHook(func, sync_items, nop, nullptr);
+                    sync_items_hooked = true;
+                }
+            }
+        });
+    }
+
     auto on_update() -> void override
     {
+        // TODO
+        // Client::Tick();
+    }
+
+    static void nop(RC::Unreal::UnrealScriptFunctionCallableContext& context, void* customdata)
+    {
+    }
+
+    static void sync_items(RC::Unreal::UnrealScriptFunctionCallableContext& context, void* customdata)
+    {
+        // TODO
     }
 };
 
