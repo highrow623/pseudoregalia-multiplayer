@@ -27,39 +27,35 @@ async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, addr
 
     // Spawn write thread
     let state2 = state.clone();
-    let join = tokio::spawn(async move {
+    let write_thread = tokio::spawn(async move {
         while let Some(index) = rx.recv().await {
             let updates = state2.lock().unwrap().gen_updates(index);
             let msg = match serde_json::to_string(&updates) {
                 Ok(msg) => msg,
-                Err(err) => {
-                    println!("{addr}: failed to serialize updates: {err}");
-                    break;
-                }
+                Err(err) => return Err(format!("failed to serialize updates: {}", err)),
             };
             if let Err(err) = ws_write.send(msg.into()).await {
-                println!("{addr}: failed to send updates: {err}");
-                break;
+                return Err(format!("failed to send updates: {}", err));
             }
         }
+        Ok(())
     });
 
     // The index into state for this player. A value of None indicates the player hasn't sent an
     // initial message.
     let mut index = None;
 
-    while let Some(msg) = ws_read.next().await {
+    let result = loop {
         // Validate message
+        let Some(msg) = ws_read.next().await else {
+            break Ok(String::from("stream reader closed"));
+        };
         let msg = match msg {
             Ok(msg) => msg,
-            Err(err) => {
-                println!("{addr}: failed to get next: {err}");
-                break;
-            }
+            Err(err) => break Err(format!("failed to get next: {}", err)),
         };
         if msg.is_close() {
-            println!("{addr}: received close message");
-            break;
+            break Ok(String::from("received close message"));
         }
         if !msg.is_text() && !msg.is_binary() {
             continue;
@@ -67,18 +63,12 @@ async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, addr
 
         // Parse message
         let msg = match msg.to_text() {
-            Ok(s) => s,
-            Err(err) => {
-                println!("{addr}: failed to cast message to text: {err}");
-                break;
-            }
+            Ok(msg) => msg,
+            Err(err) => break Err(format!("failed to cast message to text: {}", err)),
         };
         let info = match serde_json::from_str(msg) {
             Ok(info) => info,
-            Err(err) => {
-                println!("{addr}: failed to deserialize message: {err}");
-                break;
-            }
+            Err(err) => break Err(format!("failed to deserialize message: {}", err)),
         };
 
         // Update state
@@ -87,10 +77,7 @@ async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, addr
         } else {
             index = match state.lock().unwrap().insert(info) {
                 Ok(index) => Some(index),
-                Err(err) => {
-                    println!("{addr}: failed to insert: {err}");
-                    break;
-                }
+                Err(err) => break Err(format!("failed to insert: {}", err)),
             };
         }
 
@@ -102,18 +89,27 @@ async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, addr
             // We don't care about a Full error because that just means we've already queued an
             // update. But a Closed error means the write thread has dropped rx and is therefore no
             // longer running.
-            println!("{addr}: write thread has stopped running");
-            break;
+            break Ok(String::from("write thread has stopped running"));
         }
-    }
+    };
 
     // Cleanup
+    match result {
+        Ok(reason) => println!("{}: read thread closed: {}", addr, reason),
+        Err(err) => println!("{}: read thread closed with error: {}", addr, err),
+    }
     drop(tx);
-    let _ = join.await;
+    match write_thread.await {
+        Ok(result) => match result {
+            Ok(_) => println!("{}: write thread closed", addr),
+            Err(err) => println!("{}: write thread closed with error: {}", addr, err),
+        },
+        Err(err) => println!("{}: write thread encountered panic: {}", addr, err),
+    }
     if let Some(index) = index {
         state.lock().unwrap().remove(index);
     }
-    println!("{addr}: disconnected");
+    println!("{}: disconnected", addr);
 }
 
 #[tokio::main]
