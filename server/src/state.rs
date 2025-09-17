@@ -13,6 +13,18 @@ pub struct PlayerInfo {
     ly: Option<i64>,
     /// Location Z
     lz: Option<i64>,
+    /// Rotation X
+    rx: Option<i64>,
+    /// Rotation Y
+    ry: Option<i64>,
+    /// Rotation Z
+    rz: Option<i64>,
+    /// Scale X
+    sx: Option<i64>,
+    /// Scale Y
+    sy: Option<i64>,
+    /// Scale Z
+    sz: Option<i64>,
 }
 
 /// helper for `PlayerInfo::update`
@@ -55,6 +67,12 @@ impl PlayerInfo {
         update_field!(self, info, lx);
         update_field!(self, info, ly);
         update_field!(self, info, lz);
+        update_field!(self, info, rx);
+        update_field!(self, info, ry);
+        update_field!(self, info, rz);
+        update_field!(self, info, sx);
+        update_field!(self, info, sy);
+        update_field!(self, info, sz);
     }
 
     /// Updates self to match real and returns a copy that reports which fields were updated.
@@ -64,6 +82,12 @@ impl PlayerInfo {
             lx: gen_update_field!(self, real, lx),
             ly: gen_update_field!(self, real, ly),
             lz: gen_update_field!(self, real, lz),
+            rx: gen_update_field!(self, real, rx),
+            ry: gen_update_field!(self, real, ry),
+            rz: gen_update_field!(self, real, rz),
+            sx: gen_update_field!(self, real, sx),
+            sy: gen_update_field!(self, real, sy),
+            sz: gen_update_field!(self, real, sz),
         }
     }
 }
