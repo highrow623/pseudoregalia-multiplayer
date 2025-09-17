@@ -12,7 +12,7 @@ namespace
         const FST_PlayerInfo& GetInfo();
 
         std::deque<FST_PlayerInfo> info_queue{};
-        const size_t QUEUE_MAX = 100;
+        const size_t QUEUE_MAX = 60;
     }
 }
 
