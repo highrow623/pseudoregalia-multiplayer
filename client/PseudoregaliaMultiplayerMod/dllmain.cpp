@@ -4,6 +4,7 @@
 #include "Unreal/Hooks.hpp"
 #include "Unreal/UClass.hpp"
 #include "Unreal/UFunction.hpp"
+#include "Unreal/World.hpp"
 
 #include "Client.hpp"
 #include "Logger.hpp"
@@ -34,7 +35,7 @@ public:
         {
             if (actor->GetClassPrivate()->GetName() == L"BP_PM_Manager_C")
             {
-                Client::OnSceneLoad(actor->GetLevel()->GetName());
+                Client::OnSceneLoad(actor->GetWorld()->GetName());
 
                 if (!sync_items_hooked)
                 {

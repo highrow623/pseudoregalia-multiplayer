@@ -12,3 +12,7 @@ target_include_directories(${TARGET} PRIVATE "deps/json/include")
 target_link_libraries(${TARGET} PUBLIC UE4SS)
 
 target_compile_features(${TARGET} PUBLIC cxx_std_20)
+
+target_compile_definitions(${TARGET} PRIVATE _WIN32_WINNT=0x0600)
+
+target_compile_options(${TARGET} PRIVATE /Zc:__cplusplus)
