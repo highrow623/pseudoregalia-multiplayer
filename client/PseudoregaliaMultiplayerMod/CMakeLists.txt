@@ -5,6 +5,10 @@ project(${TARGET})
 
 add_library(${TARGET} SHARED "dllmain.cpp" "src/Client.cpp" "src/Logger.cpp")
 target_include_directories(${TARGET} PRIVATE "include")
+target_include_directories(${TARGET} PRIVATE "deps/wswrap/include")
+target_include_directories(${TARGET} PRIVATE "deps/asio/include")
+target_include_directories(${TARGET} PRIVATE "deps/websocketpp")
+target_include_directories(${TARGET} PRIVATE "deps/json/include")
 target_link_libraries(${TARGET} PUBLIC UE4SS)
 
 target_compile_features(${TARGET} PUBLIC cxx_std_20)
