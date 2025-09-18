@@ -10,3 +10,6 @@
 [submodule "client/PseudoregaliaMultiplayerMod/deps/json"]
 	path = client/PseudoregaliaMultiplayerMod/deps/json
 	url = https://github.com/nlohmann/json.git
+[submodule "client/PseudoregaliaMultiplayerMod/deps/tomlplusplus"]
+	path = client/PseudoregaliaMultiplayerMod/deps/tomlplusplus
+	url = https://github.com/marzer/tomlplusplus.git

@@ -1,0 +1,2 @@
+# The URI of the server to connect to. Must include protocol.
+uri = "ws://127.0.0.1:8080"

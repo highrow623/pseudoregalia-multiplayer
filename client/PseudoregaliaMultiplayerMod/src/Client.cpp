@@ -15,6 +15,7 @@
 #include "nlohmann/json.hpp"
 
 #include "Logger.hpp"
+#include "Settings.hpp"
 
 namespace
 {
@@ -34,8 +35,6 @@ namespace
     bool queue_connect = false;
     bool queue_disconnect = false;
     wswrap::WS* ws = nullptr;
-    // TODO make this configurable
-    const std::string URI = "ws://127.0.0.1:8080";
 
     std::optional<FST_PlayerInfo> last_sent = {};
     std::unordered_map<std::string, FST_PlayerInfo> ghost_data = {};
@@ -76,7 +75,7 @@ void Client::Tick()
         {
             try
             {
-                ws = new wswrap::WS(URI, I::OnOpen, I::OnClose, I::OnMessage, I::OnError);
+                ws = new wswrap::WS(Settings::GetURI(), I::OnOpen, I::OnClose, I::OnMessage, I::OnError);
             }
             catch (const std::exception& ex)
             {

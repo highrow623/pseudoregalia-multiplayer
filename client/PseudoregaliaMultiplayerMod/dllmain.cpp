@@ -8,6 +8,7 @@
 
 #include "Client.hpp"
 #include "Logger.hpp"
+#include "Settings.hpp"
 
 class PseudoregaliaMultiplayerMod : public RC::CppUserModBase
 {
@@ -23,6 +24,8 @@ public:
         // Do not change this unless you want to target a UE4SS version
         // other than the one you're currently building with somehow.
         //ModIntendedSDKVersion = STR("2.6");
+
+        Settings::Load();
     }
 
     ~PseudoregaliaMultiplayerMod() override
