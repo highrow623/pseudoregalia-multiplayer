@@ -27,6 +27,15 @@ pub struct PlayerInfo {
     sz: Option<i64>,
 }
 
+/// helper for `PlayerInfo::has_none`
+macro_rules! return_true_if_none {
+    ($self:ident, $field:ident) => {
+        if $self.$field.is_none() {
+            return true;
+        }
+    };
+}
+
 /// helper for `PlayerInfo::update`
 macro_rules! update_field {
     ($self:ident, $info:ident, $field:ident) => {
@@ -58,7 +67,17 @@ macro_rules! gen_update_field {
 
 impl PlayerInfo {
     fn has_none(&self) -> bool {
-        self.zo.is_none() || self.lx.is_none() || self.ly.is_none() || self.lz.is_none()
+        return_true_if_none!(self, zo);
+        return_true_if_none!(self, lx);
+        return_true_if_none!(self, ly);
+        return_true_if_none!(self, lz);
+        return_true_if_none!(self, rx);
+        return_true_if_none!(self, ry);
+        return_true_if_none!(self, rz);
+        return_true_if_none!(self, sx);
+        return_true_if_none!(self, sy);
+        return_true_if_none!(self, sz);
+        false
     }
 
     /// Updates each field in self if that field in info is Some
