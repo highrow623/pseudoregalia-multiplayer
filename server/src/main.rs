@@ -7,8 +7,7 @@ mod state;
 
 #[tokio::main]
 async fn main() {
-    // TODO read addr from env args
-    let addr = String::from("127.0.0.1:8080");
+    let addr = std::env::args().nth(1).unwrap_or(String::from("127.0.0.1:8080"));
     let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
     println!("Server started, listening on {addr}");
 
