@@ -64,6 +64,8 @@ void Client::Tick()
         {
             delete ws;
             ws = nullptr;
+            last_sent.reset();
+            last_send_time.reset();
             ghost_data.clear();
             connected = false;
         }

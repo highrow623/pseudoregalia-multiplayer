@@ -17,6 +17,7 @@
 * animations?? options to look into:
   * just use animation sequences, send a "best guess" to sync animation state
   * reuse animation bp or player controller, sync whatever data is needed for animations
+  * make new animation bp
 * also send dream breaker? or at least attach it to ghost sybil when that player is holding it
 * name tags or some ui to say who is connected and which level they are in
 * make the "message send timeout" calculate correctly?
