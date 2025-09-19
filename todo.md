@@ -2,7 +2,6 @@
 
 ## For initial release
 
-* see if I can rename fields in FST_PlayerInfo or if they have to exactly match
 * refactor unnamed namespaces in cpp mod?
 * write docs (readme, project anatomy, setup guides for mod and server)
 * add license

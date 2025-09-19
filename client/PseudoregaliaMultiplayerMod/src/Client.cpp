@@ -172,43 +172,43 @@ void I::OnMessage(const std::string& message)
             auto& ghost = ghost_data.at(key);
             if (value.contains("zo"))
             {
-                ghost.zone_2_7A1ED7FA4276A703DD7058A44D2AF8DA = RC::Unreal::FString(I::ToWide(value["zo"]).c_str());
+                ghost.zone = RC::Unreal::FString(I::ToWide(value["zo"]).c_str());
             }
             if (value.contains("lx"))
             {
-                ghost.location_x_24_A99B33C64A7E3258D121F292594BE28D = value["lx"];
+                ghost.location_x = value["lx"];
             }
             if (value.contains("ly"))
             {
-                ghost.location_y_25_F92DA72B4567F3AC671650A509495255 = value["ly"];
+                ghost.location_y = value["ly"];
             }
             if (value.contains("lz"))
             {
-                ghost.location_z_26_656F85D54404D4616F640EB43F326BC1 = value["lz"];
+                ghost.location_z = value["lz"];
             }
             if (value.contains("rx"))
             {
-                ghost.rotation_x_27_5CCE14E84D032F45F387C7BAA7E80C63 = value["rx"];
+                ghost.rotation_x = value["rx"];
             }
             if (value.contains("ry"))
             {
-                ghost.rotation_y_28_C810F6EF4BA528713F570EA57644882C = value["ry"];
+                ghost.rotation_y = value["ry"];
             }
             if (value.contains("rz"))
             {
-                ghost.rotation_z_29_CBFC70324216054968EAA7B1D823249C = value["rz"];
+                ghost.rotation_z = value["rz"];
             }
             if (value.contains("sx"))
             {
-                ghost.scale_x_30_55A9DE384646D5352090B3BF5BADC83E = value["sx"];
+                ghost.scale_x = value["sx"];
             }
             if (value.contains("sy"))
             {
-                ghost.scale_y_31_8C45682E4A4B1A074EC88AB59FA732E2 = value["sy"];
+                ghost.scale_y = value["sy"];
             }
             if (value.contains("sz"))
             {
-                ghost.scale_z_32_9D900BCF48CBE018B7FE6D942156FDA6 = value["sz"];
+                ghost.scale_z = value["sz"];
             }
         }
         else
@@ -228,16 +228,16 @@ void I::OnMessage(const std::string& message)
                 continue;
             }
             ghost_data[key] = FST_PlayerInfo{
-                .zone_2_7A1ED7FA4276A703DD7058A44D2AF8DA = RC::Unreal::FString(I::ToWide(value["zo"]).c_str()),
-                .location_x_24_A99B33C64A7E3258D121F292594BE28D = value["lx"],
-                .location_y_25_F92DA72B4567F3AC671650A509495255 = value["ly"],
-                .location_z_26_656F85D54404D4616F640EB43F326BC1 = value["lz"],
-                .rotation_x_27_5CCE14E84D032F45F387C7BAA7E80C63 = value["rx"],
-                .rotation_y_28_C810F6EF4BA528713F570EA57644882C = value["ry"],
-                .rotation_z_29_CBFC70324216054968EAA7B1D823249C = value["rz"],
-                .scale_x_30_55A9DE384646D5352090B3BF5BADC83E = value["sx"],
-                .scale_y_31_8C45682E4A4B1A074EC88AB59FA732E2 = value["sy"],
-                .scale_z_32_9D900BCF48CBE018B7FE6D942156FDA6 = value["sz"],
+                .zone = RC::Unreal::FString(I::ToWide(value["zo"]).c_str()),
+                .location_x = value["lx"],
+                .location_y = value["ly"],
+                .location_z = value["lz"],
+                .rotation_x = value["rx"],
+                .rotation_y = value["ry"],
+                .rotation_z = value["rz"],
+                .scale_x = value["sx"],
+                .scale_y = value["sy"],
+                .scale_z = value["sz"],
             };
         }
     }
@@ -269,87 +269,69 @@ std::string I::BuildUpdate()
     nlohmann::json j = nlohmann::json::object();
     if (last_sent)
     {
-        if (last_sent->zone_2_7A1ED7FA4276A703DD7058A44D2AF8DA!= player_info.zone_2_7A1ED7FA4276A703DD7058A44D2AF8DA)
+        if (last_sent->zone != player_info.zone)
         {
-            j["zo"] = player_info.zone_2_7A1ED7FA4276A703DD7058A44D2AF8DA.GetCharArray();
-            last_sent->zone_2_7A1ED7FA4276A703DD7058A44D2AF8DA = player_info.zone_2_7A1ED7FA4276A703DD7058A44D2AF8DA;
+            j["zo"] = player_info.zone.GetCharArray();
+            last_sent->zone = player_info.zone;
         }
-        if (last_sent->location_x_24_A99B33C64A7E3258D121F292594BE28D !=
-            player_info.location_x_24_A99B33C64A7E3258D121F292594BE28D)
+        if (last_sent->location_x != player_info.location_x)
         {
-            j["lx"] = player_info.location_x_24_A99B33C64A7E3258D121F292594BE28D;
-            last_sent->location_x_24_A99B33C64A7E3258D121F292594BE28D =
-                player_info.location_x_24_A99B33C64A7E3258D121F292594BE28D;
+            j["lx"] = player_info.location_x;
+            last_sent->location_x = player_info.location_x;
         }
-        if (last_sent->location_y_25_F92DA72B4567F3AC671650A509495255 !=
-            player_info.location_y_25_F92DA72B4567F3AC671650A509495255)
+        if (last_sent->location_y != player_info.location_y)
         {
-            j["ly"] = player_info.location_y_25_F92DA72B4567F3AC671650A509495255;
-            last_sent->location_y_25_F92DA72B4567F3AC671650A509495255 =
-                player_info.location_y_25_F92DA72B4567F3AC671650A509495255;
+            j["ly"] = player_info.location_y;
+            last_sent->location_y = player_info.location_y;
         }
-        if (last_sent->location_z_26_656F85D54404D4616F640EB43F326BC1 !=
-            player_info.location_z_26_656F85D54404D4616F640EB43F326BC1)
+        if (last_sent->location_z != player_info.location_z)
         {
-            j["lz"] = player_info.location_z_26_656F85D54404D4616F640EB43F326BC1;
-            last_sent->location_z_26_656F85D54404D4616F640EB43F326BC1 =
-                player_info.location_z_26_656F85D54404D4616F640EB43F326BC1;
+            j["lz"] = player_info.location_z;
+            last_sent->location_z = player_info.location_z;
         }
-        if (last_sent->rotation_x_27_5CCE14E84D032F45F387C7BAA7E80C63 !=
-            player_info.rotation_x_27_5CCE14E84D032F45F387C7BAA7E80C63)
+        if (last_sent->rotation_x != player_info.rotation_x)
         {
-            j["rx"] = player_info.rotation_x_27_5CCE14E84D032F45F387C7BAA7E80C63;
-            last_sent->rotation_x_27_5CCE14E84D032F45F387C7BAA7E80C63 =
-                player_info.rotation_x_27_5CCE14E84D032F45F387C7BAA7E80C63;
+            j["rx"] = player_info.rotation_x;
+            last_sent->rotation_x = player_info.rotation_x;
         }
-        if (last_sent->rotation_y_28_C810F6EF4BA528713F570EA57644882C !=
-            player_info.rotation_y_28_C810F6EF4BA528713F570EA57644882C)
+        if (last_sent->rotation_y != player_info.rotation_y)
         {
-            j["ry"] = player_info.rotation_y_28_C810F6EF4BA528713F570EA57644882C;
-            last_sent->rotation_y_28_C810F6EF4BA528713F570EA57644882C =
-                player_info.rotation_y_28_C810F6EF4BA528713F570EA57644882C;
+            j["ry"] = player_info.rotation_y;
+            last_sent->rotation_y = player_info.rotation_y;
         }
-        if (last_sent->rotation_z_29_CBFC70324216054968EAA7B1D823249C !=
-            player_info.rotation_z_29_CBFC70324216054968EAA7B1D823249C)
+        if (last_sent->rotation_z != player_info.rotation_z)
         {
-            j["rz"] = player_info.rotation_z_29_CBFC70324216054968EAA7B1D823249C;
-            last_sent->rotation_z_29_CBFC70324216054968EAA7B1D823249C =
-                player_info.rotation_z_29_CBFC70324216054968EAA7B1D823249C;
+            j["rz"] = player_info.rotation_z;
+            last_sent->rotation_z = player_info.rotation_z;
         }
-        if (last_sent->scale_x_30_55A9DE384646D5352090B3BF5BADC83E !=
-            player_info.scale_x_30_55A9DE384646D5352090B3BF5BADC83E)
+        if (last_sent->scale_x != player_info.scale_x)
         {
-            j["sx"] = player_info.scale_x_30_55A9DE384646D5352090B3BF5BADC83E;
-            last_sent->scale_x_30_55A9DE384646D5352090B3BF5BADC83E =
-                player_info.scale_x_30_55A9DE384646D5352090B3BF5BADC83E;
+            j["sx"] = player_info.scale_x;
+            last_sent->scale_x = player_info.scale_x;
         }
-        if (last_sent->scale_y_31_8C45682E4A4B1A074EC88AB59FA732E2 !=
-            player_info.scale_y_31_8C45682E4A4B1A074EC88AB59FA732E2)
+        if (last_sent->scale_y != player_info.scale_y)
         {
-            j["sy"] = player_info.scale_y_31_8C45682E4A4B1A074EC88AB59FA732E2;
-            last_sent->scale_y_31_8C45682E4A4B1A074EC88AB59FA732E2 =
-                player_info.scale_y_31_8C45682E4A4B1A074EC88AB59FA732E2;
+            j["sy"] = player_info.scale_y;
+            last_sent->scale_y = player_info.scale_y;
         }
-        if (last_sent->scale_z_32_9D900BCF48CBE018B7FE6D942156FDA6 !=
-            player_info.scale_z_32_9D900BCF48CBE018B7FE6D942156FDA6)
+        if (last_sent->scale_z != player_info.scale_z)
         {
-            j["sz"] = player_info.scale_z_32_9D900BCF48CBE018B7FE6D942156FDA6;
-            last_sent->scale_z_32_9D900BCF48CBE018B7FE6D942156FDA6 =
-                player_info.scale_z_32_9D900BCF48CBE018B7FE6D942156FDA6;
+            j["sz"] = player_info.scale_z;
+            last_sent->scale_z = player_info.scale_z;
         }
     }
     else
     {
-        j["zo"] = player_info.zone_2_7A1ED7FA4276A703DD7058A44D2AF8DA.GetCharArray();
-        j["lx"] = player_info.location_x_24_A99B33C64A7E3258D121F292594BE28D;
-        j["ly"] = player_info.location_y_25_F92DA72B4567F3AC671650A509495255;
-        j["lz"] = player_info.location_z_26_656F85D54404D4616F640EB43F326BC1;
-        j["rx"] = player_info.rotation_x_27_5CCE14E84D032F45F387C7BAA7E80C63;
-        j["ry"] = player_info.rotation_y_28_C810F6EF4BA528713F570EA57644882C;
-        j["rz"] = player_info.rotation_z_29_CBFC70324216054968EAA7B1D823249C;
-        j["sx"] = player_info.scale_x_30_55A9DE384646D5352090B3BF5BADC83E;
-        j["sy"] = player_info.scale_y_31_8C45682E4A4B1A074EC88AB59FA732E2;
-        j["sz"] = player_info.scale_z_32_9D900BCF48CBE018B7FE6D942156FDA6;
+        j["zo"] = player_info.zone.GetCharArray();
+        j["lx"] = player_info.location_x;
+        j["ly"] = player_info.location_y;
+        j["lz"] = player_info.location_z;
+        j["rx"] = player_info.rotation_x;
+        j["ry"] = player_info.rotation_y;
+        j["rz"] = player_info.rotation_z;
+        j["sx"] = player_info.scale_x;
+        j["sy"] = player_info.scale_y;
+        j["sz"] = player_info.scale_z;
         last_sent = player_info;
     }
     return j.dump();
