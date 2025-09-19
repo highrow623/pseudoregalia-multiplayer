@@ -2,7 +2,6 @@
 
 ## For initial release
 
-* refactor unnamed namespaces in cpp mod?
 * write docs (readme, project anatomy, setup guides for mod and server)
 * add license
 

@@ -19,15 +19,12 @@
 
 namespace
 {
-    namespace I
-    {
-        void OnOpen();
-        void OnClose();
-        void OnMessage(const std::string&);
-        void OnError(const std::string&);
-        std::wstring ToWide(const std::string&);
-        std::string BuildUpdate();
-    }
+    void OnOpen();
+    void OnClose();
+    void OnMessage(const std::string&);
+    void OnError(const std::string&);
+    std::wstring ToWide(const std::string&);
+    std::string BuildUpdate();
 
     FST_PlayerInfo player_info = {};
 
@@ -77,12 +74,12 @@ void Client::Tick()
         {
             try
             {
-                ws = new wswrap::WS(Settings::GetURI(), I::OnOpen, I::OnClose, I::OnMessage, I::OnError);
+                ws = new wswrap::WS(Settings::GetURI(), OnOpen, OnClose, OnMessage, OnError);
             }
             catch (const std::exception& ex)
             {
                 ws = nullptr;
-                Log(L"Error connecting: " + I::ToWide(ex.what()), LogType::Error);
+                Log(L"Error connecting: " + ToWide(ex.what()), LogType::Error);
             }
         }
         queue_connect = false;
@@ -112,7 +109,7 @@ void Client::Tick()
         }
         if (send_update)
         {
-            std::string update = I::BuildUpdate();
+            std::string update = BuildUpdate();
             ws->send_text(update);
         }
     }
@@ -135,24 +132,27 @@ void Client::GetGhostInfo(RC::Unreal::TArray<FST_PlayerInfo>& ghost_info)
     }
 }
 
-void I::OnOpen()
+namespace
+{
+
+void OnOpen()
 {
     Log(L"Connected to server", LogType::Loud);
     connected = true;
 }
 
-void I::OnClose()
+void OnClose()
 {
     Log(L"Disconnected from server", LogType::Loud);
     queue_disconnect = true;
 }
 
-void I::OnMessage(const std::string& message)
+void OnMessage(const std::string& message)
 {
     nlohmann::json j = nlohmann::json::parse(message);
     if (!j.is_object())
     {
-        Log(L"Received non-object message: " + I::ToWide(message), LogType::Warning);
+        Log(L"Received non-object message: " + ToWide(message), LogType::Warning);
         return;
     }
 
@@ -163,7 +163,7 @@ void I::OnMessage(const std::string& message)
         const auto& value = iter.value();
         if (!value.is_object())
         {
-            Log(L"Received non-object value for ghost " + I::ToWide(key), LogType::Warning);
+            Log(L"Received non-object value for ghost " + ToWide(key), LogType::Warning);
             continue;
         }
         keys.insert(key);
@@ -172,7 +172,7 @@ void I::OnMessage(const std::string& message)
             auto& ghost = ghost_data.at(key);
             if (value.contains("zo"))
             {
-                ghost.zone = RC::Unreal::FString(I::ToWide(value["zo"]).c_str());
+                ghost.zone = RC::Unreal::FString(ToWide(value["zo"]).c_str());
             }
             if (value.contains("lx"))
             {
@@ -224,11 +224,11 @@ void I::OnMessage(const std::string& message)
                 || !value.contains("sy")
                 || !value.contains("sz"))
             {
-                Log(L"Received initial data with missing fields for ghost " + I::ToWide(key), LogType::Warning);
+                Log(L"Received initial data with missing fields for ghost " + ToWide(key), LogType::Warning);
                 continue;
             }
             ghost_data[key] = FST_PlayerInfo{
-                .zone = RC::Unreal::FString(I::ToWide(value["zo"]).c_str()),
+                .zone = RC::Unreal::FString(ToWide(value["zo"]).c_str()),
                 .location_x = value["lx"],
                 .location_y = value["ly"],
                 .location_z = value["lz"],
@@ -253,18 +253,18 @@ void I::OnMessage(const std::string& message)
     }
 }
 
-void I::OnError(const std::string& error_message)
+void OnError(const std::string& error_message)
 {
-    Log(L"Error: " + I::ToWide(error_message), LogType::Error);
+    Log(L"Error: " + ToWide(error_message), LogType::Error);
 }
 
-std::wstring I::ToWide(const std::string& input)
+std::wstring ToWide(const std::string& input)
 {
     static std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
     return converter.from_bytes(input);
 }
 
-std::string I::BuildUpdate()
+std::string BuildUpdate()
 {
     nlohmann::json j = nlohmann::json::object();
     if (last_sent)
@@ -336,3 +336,5 @@ std::string I::BuildUpdate()
     }
     return j.dump();
 }
+
+} // namespace

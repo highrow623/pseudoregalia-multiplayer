@@ -12,11 +12,8 @@
 
 namespace
 {
-    namespace I
-    {
-        void ParseSetting(std::string&, toml::table, const std::string&);
-        std::wstring ToWide(const std::string&);
-    }
+    void ParseSetting(std::string&, toml::table, const std::string&);
+    std::wstring ToWide(const std::string&);
 
     // if you run from the executable directory
     const std::string settings_filename1 = "Mods/PseudoregaliaMultiplayerMod/settings.toml";
@@ -46,13 +43,13 @@ void Settings::Load()
     }
     catch (const toml::parse_error& err)
     {
-        Log(L"Failed to parse settings: " + I::ToWide(err.what()));
+        Log(L"Failed to parse settings: " + ToWide(err.what()));
         Log(L"Using default settings");
         return;
     }
 
     Log(L"Loading settings");
-    I::ParseSetting(uri, settings_table, "uri");
+    ParseSetting(uri, settings_table, "uri");
 }
 
 const std::string& Settings::GetURI()
@@ -60,21 +57,26 @@ const std::string& Settings::GetURI()
     return uri;
 }
 
-void I::ParseSetting(std::string& setting, toml::table settings_table, const std::string& setting_path)
+namespace
+{
+
+void ParseSetting(std::string& setting, toml::table settings_table, const std::string& setting_path)
 {
     std::optional<std::string> option = settings_table.at_path(setting_path).value<std::string>();
     if (!option)
     {
-        Log(I::ToWide(setting_path) + L" = default (setting missing or not a string)");
+        Log(ToWide(setting_path) + L" = default (setting missing or not a string)");
         return;
     }
 
-    Log(I::ToWide(setting_path + " = " + *option));
+    Log(ToWide(setting_path + " = " + *option));
     setting = *option;
 }
 
-std::wstring I::ToWide(const std::string& input)
+std::wstring ToWide(const std::string& input)
 {
     static std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
     return converter.from_bytes(input);
 }
+
+} // namespace
