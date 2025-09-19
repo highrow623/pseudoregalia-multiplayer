@@ -1,3 +1,6 @@
+// My method of converting std::string to std::wstring is deprecated but it works for what I need to do
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
+
 #include <Mod/CppUserModBase.hpp>
 
 #include "Unreal/AActor.hpp"
