@@ -2,11 +2,7 @@
 
 ## For initial release
 
-* look into reconnect bug
-* share velocity and set the ghosts to update their position based on velocity on frames when a packet is not received
-  * could probably bring the send message frequency down a bit (45ms?)
-  * maybe have ghosts freeze if an update hasn't happened in a certain amount of time, just so they don't fly off forever if network traffic is really bad
-* look into just sending float data as floats instead of ints? would have to figure out precision on serialization
+* see if I can rename fields in FST_PlayerInfo or if they have to exactly match
 * refactor unnamed namespaces in cpp mod?
 * write docs (readme, project anatomy, setup guides for mod and server)
 * add license
@@ -27,3 +23,9 @@
 * switch to UDP? would require a lot more management, and we would probably have to make each message contain all data
 * add compression and ssl?
 * improve setting connect uri, make it runtime configurable?
+* look into just sending float data as floats instead of ints? would have to figure out precision on serialization
+* share velocity and set the ghosts to update their position based on velocity on frames when a packet is not received
+  * could probably bring the send message frequency down a bit (45ms?)
+  * maybe have ghosts freeze if an update hasn't happened in a certain amount of time, just so they don't fly off forever if network traffic is really bad
+  * this can still be kinda choppy.. better would be to share more state to predict movement better in between messages
+  * using a custom player controller/reusing the one from the game could be good here
