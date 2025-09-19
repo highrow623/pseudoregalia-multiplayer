@@ -70,7 +70,11 @@ public:
     static void sync_ghost_info(RC::Unreal::UnrealScriptFunctionCallableContext& context, void* customdata)
     {
         RC::Unreal::TArray<FST_PlayerInfo> ghost_info{};
-        Client::GetGhostInfo(ghost_info);
+        bool updated = Client::GetGhostInfo(ghost_info);
+        if (!updated)
+        {
+            return;
+        }
 
         // TODO if I can figure out setting return values, I'd rather do that than calling UpdateGhosts directly
         RC::Unreal::UFunction* update_ghosts = context.Context->GetFunctionByName(L"UpdateGhosts");

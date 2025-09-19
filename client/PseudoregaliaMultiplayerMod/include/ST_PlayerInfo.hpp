@@ -16,6 +16,12 @@ struct FST_PlayerInfo
     int64_t scale_x_30_55A9DE384646D5352090B3BF5BADC83E;         // 0x0050 (size: 0x8)
     int64_t scale_y_31_8C45682E4A4B1A074EC88AB59FA732E2;         // 0x0058 (size: 0x8)
     int64_t scale_z_32_9D900BCF48CBE018B7FE6D942156FDA6;         // 0x0060 (size: 0x8)
-}; // Size: 0x68
+    int64_t velocity_x_35_686D96314BC198CBC2B07293F89633A5;      // 0x0068 (size: 0x8)
+    int64_t velocity_y_38_5A6022674523207506AE399FF526D134;      // 0x0070 (size: 0x8)
+    int64_t velocity_z_39_E19D18BB498A71CBE322749BA9B3E7D9;      // 0x0078 (size: 0x8)
+    int64_t accel_x_42_ED6B98A34D5C03F3481E62998FDD8FE8;         // 0x0080 (size: 0x8)
+    int64_t accel_y_45_BCBAD6E04F867EC8778BF2B0395E95AA;         // 0x0088 (size: 0x8)
+    int64_t accel_z_46_3ECD8E554ACF914DD98DF880F5BA0FF8;         // 0x0090 (size: 0x8)
+}; // Size: 0x98
 
 #endif

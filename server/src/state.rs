@@ -25,6 +25,18 @@ pub struct PlayerInfo {
     sy: Option<i64>,
     /// Scale Z
     sz: Option<i64>,
+    /// Velocity X
+    vx: Option<i64>,
+    /// Velocity Y
+    vy: Option<i64>,
+    /// Velocity Z
+    vz: Option<i64>,
+    /// Acceleration X
+    ax: Option<i64>,
+    /// Acceleration Y
+    ay: Option<i64>,
+    /// Acceleration Z
+    az: Option<i64>,
 }
 
 /// helper for `PlayerInfo::has_none`
@@ -77,6 +89,12 @@ impl PlayerInfo {
         return_true_if_none!(self, sx);
         return_true_if_none!(self, sy);
         return_true_if_none!(self, sz);
+        return_true_if_none!(self, vx);
+        return_true_if_none!(self, vy);
+        return_true_if_none!(self, vz);
+        return_true_if_none!(self, ax);
+        return_true_if_none!(self, ay);
+        return_true_if_none!(self, az);
         false
     }
 
@@ -92,6 +110,12 @@ impl PlayerInfo {
         update_field!(self, info, sx);
         update_field!(self, info, sy);
         update_field!(self, info, sz);
+        update_field!(self, info, vx);
+        update_field!(self, info, vy);
+        update_field!(self, info, vz);
+        update_field!(self, info, ax);
+        update_field!(self, info, ay);
+        update_field!(self, info, az);
     }
 
     /// Updates self to match real and returns a copy that reports which fields were updated.
@@ -107,6 +131,12 @@ impl PlayerInfo {
             sx: gen_update_field!(self, real, sx),
             sy: gen_update_field!(self, real, sy),
             sz: gen_update_field!(self, real, sz),
+            vx: gen_update_field!(self, real, vx),
+            vy: gen_update_field!(self, real, vy),
+            vz: gen_update_field!(self, real, vz),
+            ax: gen_update_field!(self, real, ax),
+            ay: gen_update_field!(self, real, ay),
+            az: gen_update_field!(self, real, az),
         }
     }
 }

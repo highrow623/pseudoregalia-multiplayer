@@ -31,6 +31,7 @@ namespace
 
     FST_PlayerInfo player_info = {};
 
+    bool updated = false;
     bool connected = false;
     bool queue_connect = false;
     bool queue_disconnect = false;
@@ -40,7 +41,7 @@ namespace
     std::unordered_map<std::string, FST_PlayerInfo> ghost_data = {};
 
     // TODO make this configurable?
-    const auto MS_PER_UPDATE = std::chrono::milliseconds(20);
+    const auto MS_PER_UPDATE = std::chrono::milliseconds(45);
     std::optional<std::chrono::steady_clock::time_point> last_send_time = {};
 }
 
@@ -68,6 +69,7 @@ void Client::Tick()
             last_send_time.reset();
             ghost_data.clear();
             connected = false;
+            updated = false;
         }
         queue_disconnect = false;
     }
@@ -127,12 +129,18 @@ void Client::SetPlayerInfo(const FST_PlayerInfo& info)
     player_info = info;
 }
 
-void Client::GetGhostInfo(RC::Unreal::TArray<FST_PlayerInfo>& ghost_info)
+bool Client::GetGhostInfo(RC::Unreal::TArray<FST_PlayerInfo>& ghost_info)
 {
+    if (!updated)
+    {
+        return false;
+    }
     for (const auto& [_, ghost] : ghost_data)
     {
         ghost_info.Add(ghost);
     }
+    updated = false;
+    return true;
 }
 
 void I::OnOpen()
@@ -210,6 +218,30 @@ void I::OnMessage(const std::string& message)
             {
                 ghost.scale_z_32_9D900BCF48CBE018B7FE6D942156FDA6 = value["sz"];
             }
+            if (value.contains("vx"))
+            {
+                ghost.velocity_x_35_686D96314BC198CBC2B07293F89633A5 = value["vx"];
+            }
+            if (value.contains("vy"))
+            {
+                ghost.velocity_y_38_5A6022674523207506AE399FF526D134 = value["vy"];
+            }
+            if (value.contains("vz"))
+            {
+                ghost.velocity_z_39_E19D18BB498A71CBE322749BA9B3E7D9 = value["vz"];
+            }
+            if (value.contains("ax"))
+            {
+                ghost.accel_x_42_ED6B98A34D5C03F3481E62998FDD8FE8 = value["ax"];
+            }
+            if (value.contains("ay"))
+            {
+                ghost.accel_y_45_BCBAD6E04F867EC8778BF2B0395E95AA = value["ay"];
+            }
+            if (value.contains("az"))
+            {
+                ghost.accel_z_46_3ECD8E554ACF914DD98DF880F5BA0FF8 = value["az"];
+            }
         }
         else
         {
@@ -222,7 +254,13 @@ void I::OnMessage(const std::string& message)
                 || !value.contains("rz")
                 || !value.contains("sx")
                 || !value.contains("sy")
-                || !value.contains("sz"))
+                || !value.contains("sz")
+                || !value.contains("vx")
+                || !value.contains("vy")
+                || !value.contains("vz")
+                || !value.contains("ax")
+                || !value.contains("ay")
+                || !value.contains("az"))
             {
                 Log(L"Received initial data with missing fields for ghost " + I::ToWide(key), LogType::Warning);
                 continue;
@@ -238,6 +276,12 @@ void I::OnMessage(const std::string& message)
                 .scale_x_30_55A9DE384646D5352090B3BF5BADC83E = value["sx"],
                 .scale_y_31_8C45682E4A4B1A074EC88AB59FA732E2 = value["sy"],
                 .scale_z_32_9D900BCF48CBE018B7FE6D942156FDA6 = value["sz"],
+                .velocity_x_35_686D96314BC198CBC2B07293F89633A5 = value["vx"],
+                .velocity_y_38_5A6022674523207506AE399FF526D134 = value["vy"],
+                .velocity_z_39_E19D18BB498A71CBE322749BA9B3E7D9 = value["vz"],
+                .accel_x_42_ED6B98A34D5C03F3481E62998FDD8FE8 = value["ax"],
+                .accel_y_45_BCBAD6E04F867EC8778BF2B0395E95AA = value["ay"],
+                .accel_z_46_3ECD8E554ACF914DD98DF880F5BA0FF8 = value["az"],
             };
         }
     }
@@ -251,6 +295,7 @@ void I::OnMessage(const std::string& message)
             iter++;
         }
     }
+    updated = true;
 }
 
 void I::OnError(const std::string& error_message)
@@ -337,6 +382,48 @@ std::string I::BuildUpdate()
             last_sent->scale_z_32_9D900BCF48CBE018B7FE6D942156FDA6 =
                 player_info.scale_z_32_9D900BCF48CBE018B7FE6D942156FDA6;
         }
+        if (last_sent->velocity_x_35_686D96314BC198CBC2B07293F89633A5 !=
+            player_info.velocity_x_35_686D96314BC198CBC2B07293F89633A5)
+        {
+            j["vx"] = player_info.velocity_x_35_686D96314BC198CBC2B07293F89633A5;
+            last_sent->velocity_x_35_686D96314BC198CBC2B07293F89633A5 =
+                player_info.velocity_x_35_686D96314BC198CBC2B07293F89633A5;
+        }
+        if (last_sent->velocity_y_38_5A6022674523207506AE399FF526D134 !=
+            player_info.velocity_y_38_5A6022674523207506AE399FF526D134)
+        {
+            j["vy"] = player_info.velocity_y_38_5A6022674523207506AE399FF526D134;
+            last_sent->velocity_y_38_5A6022674523207506AE399FF526D134 =
+                player_info.velocity_y_38_5A6022674523207506AE399FF526D134;
+        }
+        if (last_sent->velocity_z_39_E19D18BB498A71CBE322749BA9B3E7D9 !=
+            player_info.velocity_z_39_E19D18BB498A71CBE322749BA9B3E7D9)
+        {
+            j["vz"] = player_info.velocity_z_39_E19D18BB498A71CBE322749BA9B3E7D9;
+            last_sent->velocity_z_39_E19D18BB498A71CBE322749BA9B3E7D9 =
+                player_info.velocity_z_39_E19D18BB498A71CBE322749BA9B3E7D9;
+        }
+        if (last_sent->accel_x_42_ED6B98A34D5C03F3481E62998FDD8FE8 !=
+            player_info.accel_x_42_ED6B98A34D5C03F3481E62998FDD8FE8)
+        {
+            j["ax"] = player_info.accel_x_42_ED6B98A34D5C03F3481E62998FDD8FE8;
+            last_sent->accel_x_42_ED6B98A34D5C03F3481E62998FDD8FE8 =
+                player_info.accel_x_42_ED6B98A34D5C03F3481E62998FDD8FE8;
+        }
+        if (last_sent->accel_y_45_BCBAD6E04F867EC8778BF2B0395E95AA !=
+            player_info.accel_y_45_BCBAD6E04F867EC8778BF2B0395E95AA)
+        {
+            j["ay"] = player_info.accel_y_45_BCBAD6E04F867EC8778BF2B0395E95AA;
+            last_sent->accel_y_45_BCBAD6E04F867EC8778BF2B0395E95AA =
+                player_info.accel_y_45_BCBAD6E04F867EC8778BF2B0395E95AA;
+        }
+        if (last_sent->accel_z_46_3ECD8E554ACF914DD98DF880F5BA0FF8 !=
+            player_info.accel_z_46_3ECD8E554ACF914DD98DF880F5BA0FF8)
+        {
+            j["az"] = player_info.accel_z_46_3ECD8E554ACF914DD98DF880F5BA0FF8;
+            last_sent->accel_z_46_3ECD8E554ACF914DD98DF880F5BA0FF8 =
+                player_info.accel_z_46_3ECD8E554ACF914DD98DF880F5BA0FF8;
+        }
     }
     else
     {
@@ -350,6 +437,12 @@ std::string I::BuildUpdate()
         j["sx"] = player_info.scale_x_30_55A9DE384646D5352090B3BF5BADC83E;
         j["sy"] = player_info.scale_y_31_8C45682E4A4B1A074EC88AB59FA732E2;
         j["sz"] = player_info.scale_z_32_9D900BCF48CBE018B7FE6D942156FDA6;
+        j["vx"] = player_info.velocity_x_35_686D96314BC198CBC2B07293F89633A5;
+        j["vy"] = player_info.velocity_y_38_5A6022674523207506AE399FF526D134;
+        j["vz"] = player_info.velocity_z_39_E19D18BB498A71CBE322749BA9B3E7D9;
+        j["ax"] = player_info.accel_x_42_ED6B98A34D5C03F3481E62998FDD8FE8;
+        j["ay"] = player_info.accel_y_45_BCBAD6E04F867EC8778BF2B0395E95AA;
+        j["az"] = player_info.accel_z_46_3ECD8E554ACF914DD98DF880F5BA0FF8;
         last_sent = player_info;
     }
     return j.dump();
