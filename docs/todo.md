@@ -15,10 +15,12 @@
 * also send dream breaker? or at least attach it to ghost sybil when that player is holding it
 * name tags or some ui to say who is connected and which level they are in
 * make the "message send timeout" calculate correctly?
+  * this won't matter if I use UDP for updates, because I'll send an update every frame
 * have AddGhostData return the list of ghost ids to remove so that BP_PM_Manager.UpdateGhosts doesn't have to recalculate that
   * this could also just be in the message from the server so the client doesn't have to calculate it at all?
 * the only info that needs to be shared between threads in the server is the real data, each thread can maintain its own list of "last sent" data
 * switch to UDP? would require a lot more management, and we would probably have to make each message contain all data
+  * could also still use TCP to set up and maintain a connection, and UDP to share frame-to-frame updates?
 * add compression and ssl?
 * improve setting connect uri, make it runtime configurable?
 * look into just sending float data as floats instead of ints? would have to figure out precision on serialization
