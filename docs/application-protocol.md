@@ -48,6 +48,8 @@ The `PlayerLeft` message is sent when a connected player has disconnected.
 
 # UDP Scheme
 
+## Client (Server-bound) Packets
+
 After establishing a WebSocket connection and receiving a `Connected` packet, clients send a UDP packet every frame to inform the server of their current state. The update is 52 bytes long and has the following format:
 
 * Update number (unsigned 32-bit integer, 4 bytes): since UDP packets can arrive out of order, this is used by the server to determine whether to accept an update. A value of 0 is used by the server to indicate an update has not arrived yet for this player, so the first update the client sends has an update number of 1. Each time the client sends a packet, it increments the update number by 1.
@@ -65,6 +67,8 @@ Notes:
 
 * Each number in the update is in big endian format.
 * After update number and player id, the server doesn't do anything with the data except store it and pass it along to other players.
+
+## Server (Client-bound) Packets
 
 Once an update is accepted by the server, the server sends one or more UDP packets with the current state of other connected players. An update is `4 + 48 * num_updates` bytes long and has the following format:
 

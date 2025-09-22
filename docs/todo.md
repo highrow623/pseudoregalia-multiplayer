@@ -2,7 +2,8 @@
 
 ## For initial release
 
-* write docs (readme, project anatomy, setup guides for mod and server)
+* update client to use the new application protocol, test
+* finish writing docs
 * add license
 
 ## Other
