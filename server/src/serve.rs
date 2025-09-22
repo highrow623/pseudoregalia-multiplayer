@@ -1,4 +1,4 @@
-use crate::state::{PlayerState, State};
+use crate::state::{CLIENT_PACKET_LEN, PlayerState, State};
 use std::sync::{Arc, Mutex};
 use tokio::net::{TcpListener, UdpSocket};
 
@@ -31,12 +31,12 @@ pub async fn tcp(state: Arc<Mutex<State>>, tcp_listener: TcpListener) {
 }
 
 pub async fn udp(state: Arc<Mutex<State>>, udp_socket: UdpSocket) {
-    let mut buf = [0u8; 52];
+    let mut buf = [0u8; CLIENT_PACKET_LEN];
     let udp_socket = Arc::new(udp_socket);
     loop {
         match udp_socket.recv_from(&mut buf).await {
             Ok((len, addr)) => {
-                if len != 52 {
+                if len != CLIENT_PACKET_LEN {
                     println!("Received UDP packet of the incorrect length: {}", len);
                     continue;
                 }

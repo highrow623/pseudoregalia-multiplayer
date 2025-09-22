@@ -2,27 +2,32 @@ use rand::{Rng, SeedableRng, rngs::SmallRng};
 use std::collections::HashMap;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
+pub const HEADER_LEN: usize = 4;
+const ID_LEN: usize = 4;
+pub const STATE_LEN: usize = 48;
+pub const CLIENT_PACKET_LEN: usize = HEADER_LEN + STATE_LEN;
+
 pub struct PlayerState {
     num: u32,
-    pub num_bytes: [u8; 4],
+    pub num_bytes: [u8; HEADER_LEN],
     pub id: u32,
-    bytes: [u8; 48],
+    bytes: [u8; STATE_LEN],
 }
 
 impl PlayerState {
     /// Creates a new PlayerState from its byte representation.
-    pub fn from_bytes(bytes: &[u8; 52]) -> Self {
-        let num_bytes = bytes[0..4].try_into().unwrap();
+    pub fn from_bytes(bytes: &[u8; CLIENT_PACKET_LEN]) -> Self {
+        let num_bytes = bytes[..HEADER_LEN].try_into().unwrap();
         Self {
             num: u32::from_be_bytes(num_bytes),
             num_bytes,
-            id: u32::from_be_bytes(bytes[4..8].try_into().unwrap()),
-            bytes: bytes[4..52].try_into().unwrap(),
+            id: u32::from_be_bytes(bytes[HEADER_LEN..HEADER_LEN + ID_LEN].try_into().unwrap()),
+            bytes: bytes[HEADER_LEN..].try_into().unwrap(),
         }
     }
 
     fn new(id: u32) -> Self {
-        Self { num: 0, num_bytes: [0u8; 4], id, bytes: [0u8; 48] }
+        Self { num: 0, num_bytes: [0u8; HEADER_LEN], id, bytes: [0u8; STATE_LEN] }
     }
 
     fn update(&mut self, other: Self) -> bool {
@@ -102,7 +107,7 @@ impl State {
     /// Returns true if state was updated.
     pub fn update(&mut self, player_state: PlayerState) -> bool {
         // should this be combined with filtered_state?
-        // and return Option<Vec<[u8; 48]>>
+        // and return Option<Vec<[u8; STATE_LEN]>>
         match self.players.get_mut(&player_state.id) {
             Some(player) => player.state.update(player_state),
             None => false,
@@ -111,7 +116,7 @@ impl State {
 
     /// Returns the current bytes for every player, skipping the player with id matching the `id`
     /// param and other players that haven't been updated yet.
-    pub fn filtered_state(&self, id: u32) -> Vec<[u8; 48]> {
+    pub fn filtered_state(&self, id: u32) -> Vec<[u8; STATE_LEN]> {
         let mut filtered_state = Vec::with_capacity(self.players.len());
         for (inner_id, player) in &self.players {
             if id == *inner_id || player.state.num == 0u32 {

@@ -1,12 +1,10 @@
-use crate::state::{PlayerState, State};
+use crate::state::{HEADER_LEN, PlayerState, STATE_LEN, State};
 use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
 use tokio::net::UdpSocket;
 
-const HEADER_LEN: usize = 4;
-const STATE_LEN: usize = 48;
 const MAX_STATES_PER_PACKET: usize = 10;
 const MAX_PACKET_LEN: usize = HEADER_LEN + MAX_STATES_PER_PACKET * STATE_LEN;
 const _: () = assert!(MAX_PACKET_LEN <= 508);
