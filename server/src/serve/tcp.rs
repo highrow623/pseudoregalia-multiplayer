@@ -28,12 +28,6 @@ struct DisconnectHandler {
     id: u32,
 }
 
-impl DisconnectHandler {
-    fn new(state: Arc<Mutex<State>>, id: u32) -> Self {
-        Self { state, id }
-    }
-}
-
 impl Drop for DisconnectHandler {
     fn drop(&mut self) {
         self.state.lock().unwrap().disconnect(self.id);
@@ -62,7 +56,7 @@ pub async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, 
         println!("{}: id collision error", addr);
         return;
     };
-    let _disconnect_handler = DisconnectHandler::new(state.clone(), id);
+    let _disconnect_handler = DisconnectHandler { state: state.clone(), id };
 
     let msg = ServerMessage::Connected { id, players };
     let msg = serde_json::to_string(&msg).unwrap();
