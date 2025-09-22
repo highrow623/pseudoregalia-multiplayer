@@ -10,24 +10,24 @@ pub const CLIENT_PACKET_LEN: usize = HEADER_LEN + STATE_LEN;
 pub struct PlayerState {
     update_num: u32,
     pub update_num_bytes: [u8; HEADER_LEN],
-    pub id: u32,
     bytes: [u8; STATE_LEN],
 }
 
 impl PlayerState {
     /// Creates a new PlayerState from its byte representation.
-    pub fn from_bytes(bytes: &[u8; CLIENT_PACKET_LEN]) -> Self {
+    pub fn from_bytes(bytes: &[u8; CLIENT_PACKET_LEN]) -> (u32, Self) {
         let update_num_bytes = bytes[..HEADER_LEN].try_into().unwrap();
-        Self {
+        let id = u32::from_be_bytes(bytes[HEADER_LEN..HEADER_LEN + ID_LEN].try_into().unwrap());
+        let player_state = Self {
             update_num: u32::from_be_bytes(update_num_bytes),
             update_num_bytes,
-            id: u32::from_be_bytes(bytes[HEADER_LEN..HEADER_LEN + ID_LEN].try_into().unwrap()),
             bytes: bytes[HEADER_LEN..].try_into().unwrap(),
-        }
+        };
+        (id, player_state)
     }
 
-    fn new(id: u32) -> Self {
-        Self { update_num: 0, update_num_bytes: [0u8; HEADER_LEN], id, bytes: [0u8; STATE_LEN] }
+    fn new() -> Self {
+        Self { update_num: 0, update_num_bytes: [0u8; HEADER_LEN], bytes: [0u8; STATE_LEN] }
     }
 
     fn update(&mut self, other: Self) -> bool {
@@ -51,8 +51,8 @@ struct Player {
 }
 
 impl Player {
-    fn new(id: u32, tx: UnboundedSender<ConnectionUpdate>) -> Self {
-        Self { state: PlayerState::new(id), tx }
+    fn new(tx: UnboundedSender<ConnectionUpdate>) -> Self {
+        Self { state: PlayerState::new(), tx }
     }
 }
 
@@ -85,7 +85,7 @@ impl State {
         }
 
         let (tx, rx) = mpsc::unbounded_channel();
-        self.players.insert(id, Player::new(id, tx));
+        self.players.insert(id, Player::new(tx));
 
         Some((id, rx, others))
     }
@@ -105,10 +105,10 @@ impl State {
 
     /// Updates player state if the id exists and the state number is greater than the current.
     /// Returns true if state was updated.
-    pub fn update(&mut self, player_state: PlayerState) -> bool {
+    pub fn update(&mut self, id: u32, player_state: PlayerState) -> bool {
         // should this be combined with filtered_state?
         // and return Option<Vec<[u8; STATE_LEN]>>
-        match self.players.get_mut(&player_state.id) {
+        match self.players.get_mut(&id) {
             Some(player) => player.state.update(player_state),
             None => false,
         }

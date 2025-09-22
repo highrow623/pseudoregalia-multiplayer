@@ -40,9 +40,10 @@ pub async fn udp(state: Arc<Mutex<State>>, udp_socket: UdpSocket) {
                     println!("Received UDP packet of the incorrect length: {}", len);
                     continue;
                 }
-                let player_state = PlayerState::from_bytes(&buf);
+                let (id, player_state) = PlayerState::from_bytes(&buf);
                 tokio::spawn(udp::handle_packet(
                     state.clone(),
+                    id,
                     player_state,
                     udp_socket.clone(),
                     addr,
