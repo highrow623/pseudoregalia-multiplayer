@@ -8,8 +8,8 @@ pub const STATE_LEN: usize = 48;
 pub const CLIENT_PACKET_LEN: usize = HEADER_LEN + STATE_LEN;
 
 pub struct PlayerState {
-    num: u32,
-    pub num_bytes: [u8; HEADER_LEN],
+    update_num: u32,
+    pub update_num_bytes: [u8; HEADER_LEN],
     pub id: u32,
     bytes: [u8; STATE_LEN],
 }
@@ -17,21 +17,21 @@ pub struct PlayerState {
 impl PlayerState {
     /// Creates a new PlayerState from its byte representation.
     pub fn from_bytes(bytes: &[u8; CLIENT_PACKET_LEN]) -> Self {
-        let num_bytes = bytes[..HEADER_LEN].try_into().unwrap();
+        let update_num_bytes = bytes[..HEADER_LEN].try_into().unwrap();
         Self {
-            num: u32::from_be_bytes(num_bytes),
-            num_bytes,
+            update_num: u32::from_be_bytes(update_num_bytes),
+            update_num_bytes,
             id: u32::from_be_bytes(bytes[HEADER_LEN..HEADER_LEN + ID_LEN].try_into().unwrap()),
             bytes: bytes[HEADER_LEN..].try_into().unwrap(),
         }
     }
 
     fn new(id: u32) -> Self {
-        Self { num: 0, num_bytes: [0u8; HEADER_LEN], id, bytes: [0u8; STATE_LEN] }
+        Self { update_num: 0, update_num_bytes: [0u8; HEADER_LEN], id, bytes: [0u8; STATE_LEN] }
     }
 
     fn update(&mut self, other: Self) -> bool {
-        if other.num > self.num {
+        if other.update_num > self.update_num {
             *self = other;
             true
         } else {
@@ -119,7 +119,7 @@ impl State {
     pub fn filtered_state(&self, id: u32) -> Vec<[u8; STATE_LEN]> {
         let mut filtered_state = Vec::with_capacity(self.players.len());
         for (inner_id, player) in &self.players {
-            if id == *inner_id || player.state.num == 0u32 {
+            if id == *inner_id || player.state.update_num == 0u32 {
                 continue;
             }
             filtered_state.push(player.state.bytes);

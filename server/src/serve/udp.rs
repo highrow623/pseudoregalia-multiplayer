@@ -18,14 +18,14 @@ pub async fn handle_packet(
 ) {
     // copy out needed fields before player_state is consumed
     let id = player_state.id;
-    let num_bytes = player_state.num_bytes;
+    let update_num_bytes = player_state.update_num_bytes;
     if !state.lock().unwrap().update(player_state) {
         return;
     }
 
     let mut buf = [0u8; MAX_PACKET_LEN];
     let mut states_in_buf = 0;
-    buf[..HEADER_LEN].copy_from_slice(&num_bytes[..]);
+    buf[..HEADER_LEN].copy_from_slice(&update_num_bytes[..]);
     let filtered_state = state.lock().unwrap().filtered_state(id);
     for bytes in filtered_state.iter() {
         // states_in_buf ranges from 0 to MAX_STATES_PER_PACKET - 1 here so copy target will always
