@@ -1,6 +1,6 @@
 use crate::state::{ConnectionUpdate, State};
 use futures_util::{SinkExt, StreamExt};
-use serde::{Deserialize, Serialize, ser::SerializeMap};
+use serde::{Deserialize, Serialize};
 use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
@@ -8,47 +8,18 @@ use std::{
 use tokio::net::TcpStream;
 use tokio_tungstenite::WebSocketStream;
 
+#[derive(Serialize)]
+#[serde(tag = "type")]
 enum ServerMessage {
     Connected { id: u32, players: Vec<u32> },
     PlayerJoined { id: u32 },
     PlayerLeft { id: u32 },
 }
 
-impl Serialize for ServerMessage {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            Self::Connected { id, players } => {
-                let mut map = serializer.serialize_map(Some(3))?;
-                map.serialize_entry("type", "Connected")?;
-                map.serialize_entry("id", id)?;
-                map.serialize_entry("players", players)?;
-                map.end()
-            }
-            Self::PlayerJoined { id } => {
-                let mut map = serializer.serialize_map(Some(2))?;
-                map.serialize_entry("type", "PlayerJoined")?;
-                map.serialize_entry("id", id)?;
-                map.end()
-            }
-            Self::PlayerLeft { id } => {
-                let mut map = serializer.serialize_map(Some(2))?;
-                map.serialize_entry("type", "PlayerLeft")?;
-                map.serialize_entry("id", id)?;
-                map.end()
-            }
-        }
-    }
-}
-
-// TODO if this gets more complicated, with different message types and additional fields besides
-// type, switch to enum and implement custom Deserialize
 #[derive(Deserialize)]
-struct ClientMessage {
-    #[serde(rename = "type")]
-    msg_type: String,
+#[serde(tag = "type")]
+enum ClientMessage {
+    Connect,
 }
 
 /// Cleans up connection by disconnecting id from state on drop
@@ -147,12 +118,12 @@ async fn receive_connect_message(ws_stream: &mut WebSocketStream<TcpStream>) -> 
 
         // Parse message
         let msg = msg.to_text().map_err(|e| format!("failed to cast message to text: {}", e))?;
-        let msg = serde_json::from_str::<ClientMessage>(msg)
+        // Currently, the only valid client message is Connect, which has no fields, so we only care
+        // if deserialization is successful.
+        // TODO if more client message types get added or the Connect message gets fields added to
+        // it, msg will have to actually be used.
+        let _msg = serde_json::from_str::<ClientMessage>(msg)
             .map_err(|e| format!("failed to deserialize message: {}", e))?;
-
-        if msg.msg_type != "Connect" {
-            return Err(String::from("ill-formed command received"));
-        }
 
         return Ok(());
     }
