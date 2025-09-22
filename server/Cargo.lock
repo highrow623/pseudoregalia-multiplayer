@@ -719,6 +719,7 @@ name = "server"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "rand",
  "serde",
  "serde_json",
  "serde_with",

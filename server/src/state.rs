@@ -1,225 +1,124 @@
-use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use rand::{Rng, SeedableRng, rngs::SmallRng};
+use std::collections::HashMap;
+use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
-/// The contents of messages passed to and from the server, containing data for a player.
-#[serde_with::skip_serializing_none]
-#[derive(Clone, Default, Deserialize, Serialize)]
-pub struct PlayerInfo {
-    /// ZOne
-    zo: Option<String>,
-    /// Location X
-    lx: Option<i64>,
-    /// Location Y
-    ly: Option<i64>,
-    /// Location Z
-    lz: Option<i64>,
-    /// Rotation X
-    rx: Option<i64>,
-    /// Rotation Y
-    ry: Option<i64>,
-    /// Rotation Z
-    rz: Option<i64>,
-    /// Scale X
-    sx: Option<i64>,
-    /// Scale Y
-    sy: Option<i64>,
-    /// Scale Z
-    sz: Option<i64>,
+pub struct PlayerState {
+    num: u32,
+    pub num_bytes: [u8; 4],
+    pub id: u32,
+    bytes: [u8; 48],
 }
 
-/// helper for `PlayerInfo::has_none`
-macro_rules! return_true_if_none {
-    ($self:ident, $field:ident) => {
-        if $self.$field.is_none() {
-            return true;
-        }
-    };
-}
-
-/// helper for `PlayerInfo::update`
-macro_rules! update_field {
-    ($self:ident, $info:ident, $field:ident) => {
-        if $info.$field.is_some() {
-            $self.$field = $info.$field;
-        }
-    };
-}
-
-/// helper for `PlayerInfo::gen_update`
-macro_rules! gen_update_field {
-    ($self:ident, $real:ident, $field:ident) => {
-        if $self.$field != $real.$field {
-            $self.$field = $real.$field;
-            $real.$field
-        } else {
-            None
-        }
-    };
-    ($self:ident, $real:ident, clone $field:ident) => {
-        if $self.$field != $real.$field {
-            $self.$field = $real.$field.clone();
-            $real.$field.clone()
-        } else {
-            None
-        }
-    };
-}
-
-impl PlayerInfo {
-    fn has_none(&self) -> bool {
-        return_true_if_none!(self, zo);
-        return_true_if_none!(self, lx);
-        return_true_if_none!(self, ly);
-        return_true_if_none!(self, lz);
-        return_true_if_none!(self, rx);
-        return_true_if_none!(self, ry);
-        return_true_if_none!(self, rz);
-        return_true_if_none!(self, sx);
-        return_true_if_none!(self, sy);
-        return_true_if_none!(self, sz);
-        false
-    }
-
-    /// Updates each field in self if that field in info is Some
-    fn update(&mut self, info: Self) {
-        update_field!(self, info, zo);
-        update_field!(self, info, lx);
-        update_field!(self, info, ly);
-        update_field!(self, info, lz);
-        update_field!(self, info, rx);
-        update_field!(self, info, ry);
-        update_field!(self, info, rz);
-        update_field!(self, info, sx);
-        update_field!(self, info, sy);
-        update_field!(self, info, sz);
-    }
-
-    /// Updates self to match real and returns a copy that reports which fields were updated.
-    fn gen_update(&mut self, real: &Self) -> Self {
+impl PlayerState {
+    /// Creates a new PlayerState from its byte representation.
+    pub fn from_bytes(bytes: &[u8; 52]) -> Self {
+        let num_bytes = bytes[0..4].try_into().unwrap();
         Self {
-            zo: gen_update_field!(self, real, clone zo),
-            lx: gen_update_field!(self, real, lx),
-            ly: gen_update_field!(self, real, ly),
-            lz: gen_update_field!(self, real, lz),
-            rx: gen_update_field!(self, real, rx),
-            ry: gen_update_field!(self, real, ry),
-            rz: gen_update_field!(self, real, rz),
-            sx: gen_update_field!(self, real, sx),
-            sy: gen_update_field!(self, real, sy),
-            sz: gen_update_field!(self, real, sz),
+            num: u32::from_be_bytes(num_bytes),
+            num_bytes,
+            id: u32::from_be_bytes(bytes[4..8].try_into().unwrap()),
+            bytes: bytes[4..52].try_into().unwrap(),
         }
+    }
+
+    fn new(id: u32) -> Self {
+        Self { num: 0, num_bytes: [0u8; 4], id, bytes: [0u8; 48] }
+    }
+
+    fn update(&mut self, other: Self) -> bool {
+        if other.num > self.num {
+            *self = other;
+            true
+        } else {
+            false
+        }
+    }
+}
+
+pub enum ConnectionUpdate {
+    Connected(u32),
+    Disconnected(u32),
+}
+
+struct Player {
+    state: PlayerState,
+    tx: UnboundedSender<ConnectionUpdate>,
+}
+
+impl Player {
+    fn new(id: u32, tx: UnboundedSender<ConnectionUpdate>) -> Self {
+        Self { state: PlayerState::new(id), tx }
     }
 }
 
 /// Shared state between all threads, used to track what has been received from and what should be
 /// sent to players.
 pub struct State {
-    /// A square vector.
-    /// `info[index][index]` contains the "real" info for the player at `index`.
-    /// `info[other][index]` contains the "last" version of `other`'s info that was sent to `index`.
-    info: Vec<Vec<PlayerInfo>>,
-    /// The indexes into `info` that should be skipped, representing players who have disconnected.
-    /// These indexes will be recycled on connection if available. Otherwise, `info` will grow.
-    skip: HashSet<usize>,
+    players: HashMap<u32, Player>,
+    rng: SmallRng,
 }
 
 impl State {
     pub fn new() -> Self {
-        Self { info: Vec::new(), skip: HashSet::new() }
+        Self { players: HashMap::new(), rng: SmallRng::from_rng(&mut rand::rng()) }
     }
 
-    /// Adds `info` to vec and returns the `index` that should be used as a param to other functions
-    /// in `State`. Initial values for all "last" entries in the vec will be set to default to
-    /// indicate that no update has been sent, ensuring that the first update will include all info.
-    ///
-    /// If a player has previously disconnected, their `index` will be recycled.
-    ///
-    /// This func will return `Err` if `info` has any fields equal to `None`.
-    pub fn insert(&mut self, info: PlayerInfo) -> Result<usize, String> {
-        if info.has_none() {
-            Err(String::from("tried to insert info that wasn't fully defined"))
-        } else if self.info.is_empty() {
-            // Initial insert
-            self.info.push(vec![info]);
-            Ok(0)
-        } else if self.skip.is_empty() {
-            // No values to recycle from skip, so the new index goes at the end of info
-            let index = self.info.len();
+    pub fn connect(&mut self) -> Option<(u32, UnboundedReceiver<ConnectionUpdate>, Vec<u32>)> {
+        let id: u32 = self.rng.random();
+        if self.players.contains_key(&id) {
+            // id collision
+            return None;
+        }
 
-            for other in 0..index {
-                self.info[other].push(PlayerInfo::default());
-            }
+        // create list of other players' ids while informing other players of this new connection
+        let mut others = Vec::with_capacity(self.players.len());
+        for (player_id, player) in &self.players {
+            others.push(*player_id);
+            // if the corresponding rx has been dropped, it doesn't matter that this message won't
+            // get read, so we can ignore the error
+            let _ = player.tx.send(ConnectionUpdate::Connected(id));
+        }
 
-            let mut new_vec = vec![PlayerInfo::default(); index];
-            new_vec.push(info);
-            self.info.push(new_vec);
+        let (tx, rx) = mpsc::unbounded_channel();
+        self.players.insert(id, Player::new(id, tx));
 
-            Ok(index)
-        } else {
-            // Recycle any value from skip
-            let index = self.skip.iter().next().unwrap().clone();
-            self.skip.remove(&index);
+        Some((id, rx, others))
+    }
 
-            for other in 0..self.info.len() {
-                if self.skip_other(index, other) {
-                    continue;
-                }
-                self.info[other][index] = PlayerInfo::default();
-                self.info[index][other] = PlayerInfo::default();
-            }
-            self.info[index][index] = info;
+    /// Removes the player associated with id from state and informs other players that they
+    /// disconnected.
+    pub fn disconnect(&mut self, id: u32) {
+        if let None = self.players.remove(&id) {
+            // TODO this shouldn't happen, right?
+            return;
+        }
 
-            Ok(index)
+        for player in self.players.values() {
+            let _ = player.tx.send(ConnectionUpdate::Disconnected(id));
         }
     }
 
-    /// Removes `index` from the state. The player that calls this function should not use `index`
-    /// to call any other functions in `State`.
-    pub fn remove(&mut self, index: usize) {
-        assert!(self.valid_index(index));
-        self.skip.insert(index);
+    /// Updates player state if the id exists and the state number is greater than the current.
+    /// Returns true if state was updated.
+    pub fn update(&mut self, player_state: PlayerState) -> bool {
+        // should this be combined with filtered_state?
+        // and return Option<Vec<[u8; 48]>>
+        match self.players.get_mut(&player_state.id) {
+            Some(player) => player.state.update(player_state),
+            None => false,
+        }
     }
 
-    /// Updates the state for any values in `info` that are not `None`.
-    pub fn update(&mut self, index: usize, info: PlayerInfo) {
-        assert!(self.valid_index(index));
-        let real = &mut self.info[index][index];
-        real.update(info);
-    }
-
-    /// Generates a map of updates for the player at `index`. A particular field is only sent in the
-    /// update if the "real" value differs from the "last" value sent. Each `other` valid player is
-    /// always included in the map to inform the player that `other` is still connected, even if
-    /// there are no updates for that player.
-    pub fn gen_updates(&mut self, index: usize) -> HashMap<usize, PlayerInfo> {
-        assert!(self.valid_index(index));
-        let mut updates = HashMap::new();
-        for other in 0..self.info.len() {
-            if self.skip_other(index, other) {
+    /// Returns the current bytes for every player, skipping the player with id matching the `id`
+    /// param and other players that haven't been updated yet.
+    pub fn filtered_state(&self, id: u32) -> Vec<[u8; 48]> {
+        let mut filtered_state = Vec::with_capacity(self.players.len());
+        for (inner_id, player) in &self.players {
+            if id == *inner_id || player.state.num == 0u32 {
                 continue;
             }
-
-            // Fairly nasty, but this lets us update only the fields in last that need to be updated
-            // while creating the update, which saves us from unnecessarily cloning zone, a String.
-            let max = std::cmp::max(index, other);
-            let (left, right) = self.info[other].split_at_mut(max);
-            let (last, real) = if max == other {
-                (&mut left[index], &right[0])
-            } else {
-                // max == index
-                (&mut right[0], &left[other])
-            };
-            let update = last.gen_update(real);
-            updates.insert(other, update);
+            filtered_state.push(player.state.bytes);
         }
-        updates
-    }
-
-    fn valid_index(&self, index: usize) -> bool {
-        index < self.info.len() && !self.skip.contains(&index)
-    }
-
-    fn skip_other(&self, index: usize, other: usize) -> bool {
-        index == other || self.skip.contains(&other)
+        filtered_state
     }
 }
