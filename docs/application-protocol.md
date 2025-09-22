@@ -1,25 +1,30 @@
 # Application Protocol
 
-Communication between clients and the server consists of both WebSocket messages and UDP packets. The client first establishes a WebSocket connection, which the server uses to send important but less frequent updates. The client and server then trade UDP packets with the frame-by-frame data to sync state.
+Communication between client and server consists of both WebSocket messages and UDP packets. The client first establishes a WebSocket connection, which the server uses to send important but less frequent updates. The client and server then trade UDP packets with the frame-by-frame data to sync state.
 
 # WebSocket Scheme
 
-All messages, whether client-bound or server-bound, have the following JSON format:
+All messages are in JSON format, with a `type` field to indicate its purpose, as well as any other fields specific to that message type. For example, a `Connected` packet (described below) might look like this:
 
 ```json
 {
-    "type": "[message-type]",
-    // zero or more fields specific to the message type
+  "type": "Connected",
+  "id": 1188764670,
+  "players": [
+    578885259,
+    846393187,
+    3840177655
+  ]
 }
 ```
 
-## Client (Server-bound) Messages
+## Client to Server Messages
 
 ### `Connect`
 
 The `Connect` message is sent after the WebSocket connection is established. This message has no additional fields, but may be updated in the future to validate the connection with a password or set a name for the player.
 
-## Server (Client-bound) Messages
+## Server to Client Messages
 
 ### `Connected`
 
@@ -28,11 +33,11 @@ The `Connected` message is sent in response to the `Connect` message to signal a
 | Field | Type | Description |
 | --- | --- | --- |
 | `id` | unsigned 32-bit integer | The id assigned to the player |
-| `players` | list of unsigned 32-bit integers | The ids of all other currently connected players |
+| `players` | array of unsigned 32-bit integers | The ids of all other currently connected players |
 
 ### `PlayerJoined`
 
-The `PlayerJoined` message is sent when a new player has joined.
+The `PlayerJoined` message is sent when a new player connects to the server.
 
 | Field | Type | Description |
 | --- | --- | --- |
@@ -40,15 +45,15 @@ The `PlayerJoined` message is sent when a new player has joined.
 
 ### `PlayerLeft`
 
-The `PlayerLeft` message is sent when a connected player has disconnected.
+The `PlayerLeft` message is sent when a connected player disconnects from the server.
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `id` | unsigned 32-bit integer | The id of the player that just left. |
+| `id` | unsigned 32-bit integer | The id of the player that just left |
 
 # UDP Scheme
 
-## Client (Server-bound) Packets
+## Client to Server Packets
 
 After establishing a WebSocket connection and receiving a `Connected` packet, clients send a UDP packet every frame to inform the server of their current state. The update is 52 bytes long and has the following format:
 
@@ -68,11 +73,11 @@ Notes:
 * Each number in the update is in big endian format.
 * After update number and player id, the server doesn't do anything with the data except store it and pass it along to other players.
 
-## Server (Client-bound) Packets
+## Server to Client Packets
 
 Once an update is accepted by the server, the server sends one or more UDP packets with the current state of other connected players. An update is `4 + 48 * num_updates` bytes long and has the following format:
 
-* Update number (unsigned 32-bit integer, 4 bytes): when the server responds to an accepted update, it uses the same update number in the response. The update number applies to all player's data in the update.
+* Update number (unsigned 32-bit integer, 4 bytes): when the server responds to an accepted update, it uses the same update number in the response.
 * Player updates (48 bytes each): Each contiguous set of 48 bytes after the first 4 contain the state for another connected player. These 48 bytes are in the same format as the player update, from player id to transform.
 
 Notes:
@@ -80,4 +85,4 @@ Notes:
 * `num_updates` will always be between 1 and 10, inclusive. So an update will have minimum length 52 and maximum length 484, and the length of an update mod 48 will always be 4.
 * If the server has to send more than 10 players' worth of updates, it will send multiple packets.
 
-The client keeps track of the last update number received for each connected player. The update number applies to each player in the update, and the update is only received for the player if it is greater than the last update received for that player.
+The client keeps track of the highest update number received for each connected player. Similar to the server, the client only accepts an update for a player if the update number is greater than the one stored for that player. The update number in the packet applies to each player in the update.
