@@ -1,6 +1,6 @@
 use crate::state::State;
 use std::{
-    process,
+    env, process,
     sync::{Arc, Mutex},
     thread,
 };
@@ -11,7 +11,7 @@ mod state;
 
 #[tokio::main]
 async fn main() {
-    let addr = std::env::args().nth(1).unwrap_or(String::from("127.0.0.1:8080"));
+    let addr = env::args().nth(1).unwrap_or(String::from("127.0.0.1:8080"));
     let tcp_listener = TcpListener::bind(&addr).await.expect("Failed to bind TCP listener");
     let udp_socket = UdpSocket::bind(&addr).await.expect("Failed to bind UDP socket");
     println!("Server started, listening on {addr}");

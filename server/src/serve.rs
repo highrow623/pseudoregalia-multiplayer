@@ -1,6 +1,6 @@
 use crate::state::{CLIENT_PACKET_LEN, PlayerState, State};
 use std::{
-    process,
+    io, process,
     sync::{Arc, Mutex},
 };
 use tokio::net::{TcpListener, UdpSocket};
@@ -10,7 +10,7 @@ mod tcp;
 mod udp;
 
 pub fn stdin() {
-    let stdin = std::io::stdin();
+    let stdin = io::stdin();
     let mut buf = String::new();
     loop {
         match stdin.read_line(&mut buf) {
