@@ -12,12 +12,10 @@ const _: () = assert!(MAX_PACKET_LEN <= 508);
 // TODO should send_to be put in a tokio::spawn()?
 pub async fn handle_packet(
     state: Arc<Mutex<State>>,
-    id: u32,
-    player_state: PlayerState,
+    (update_num_bytes, id, player_state): ([u8; HEADER_LEN], u32, PlayerState),
     udp_socket: Arc<UdpSocket>,
     addr: SocketAddr,
 ) {
-    let update_num_bytes = player_state.update_num_bytes;
     if !state.lock().unwrap().update(id, player_state) {
         return;
     }

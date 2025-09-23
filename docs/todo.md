@@ -8,6 +8,7 @@
 
 ## Other
 
+* better logging/error handling
 * update the server to handle index collisions by sending an error message and allowing the client to resend the `Connect` message
 * try reconnecting to the server when an error happens instead of only on scene load
 * animations?? options to look into:

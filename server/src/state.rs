@@ -9,25 +9,24 @@ pub const CLIENT_PACKET_LEN: usize = HEADER_LEN + STATE_LEN;
 
 pub struct PlayerState {
     update_num: u32,
-    pub update_num_bytes: [u8; HEADER_LEN],
     bytes: [u8; STATE_LEN],
 }
 
 impl PlayerState {
-    /// Creates a new PlayerState from its byte representation.
-    pub fn from_bytes(bytes: &[u8; CLIENT_PACKET_LEN]) -> (u32, Self) {
+    /// Creates a new PlayerState from its byte representation. Also returns the bytes of the update
+    /// number and the parsed id.
+    pub fn from_bytes(bytes: &[u8; CLIENT_PACKET_LEN]) -> ([u8; HEADER_LEN], u32, Self) {
         let update_num_bytes = bytes[..HEADER_LEN].try_into().unwrap();
+        let update_num = u32::from_be_bytes(update_num_bytes);
+
         let id = u32::from_be_bytes(bytes[HEADER_LEN..HEADER_LEN + ID_LEN].try_into().unwrap());
-        let player_state = Self {
-            update_num: u32::from_be_bytes(update_num_bytes),
-            update_num_bytes,
-            bytes: bytes[HEADER_LEN..].try_into().unwrap(),
-        };
-        (id, player_state)
+        let bytes = bytes[HEADER_LEN..].try_into().unwrap();
+
+        (update_num_bytes, id, Self { update_num, bytes })
     }
 
     fn new() -> Self {
-        Self { update_num: 0, update_num_bytes: [0u8; HEADER_LEN], bytes: [0u8; STATE_LEN] }
+        Self { update_num: 0, bytes: [0u8; STATE_LEN] }
     }
 
     fn update(&mut self, other: Self) -> bool {
@@ -37,6 +36,10 @@ impl PlayerState {
         } else {
             false
         }
+    }
+
+    fn has_updated(&self) -> bool {
+        self.update_num != 0u32
     }
 }
 
@@ -118,8 +121,8 @@ impl State {
     /// param and other players that haven't been updated yet.
     pub fn filtered_state(&self, id: u32) -> Vec<[u8; STATE_LEN]> {
         let mut filtered_state = Vec::with_capacity(self.players.len());
-        for (inner_id, player) in &self.players {
-            if id == *inner_id || player.state.update_num == 0u32 {
+        for (player_id, player) in &self.players {
+            if id == *player_id || !player.state.has_updated() {
                 continue;
             }
             filtered_state.push(player.state.bytes);
