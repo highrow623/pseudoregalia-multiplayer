@@ -1,5 +1,8 @@
 use crate::state::{CLIENT_PACKET_LEN, PlayerState, State};
-use std::sync::{Arc, Mutex};
+use std::{
+    process,
+    sync::{Arc, Mutex},
+};
 use tokio::net::{TcpListener, UdpSocket};
 
 mod stdin;
@@ -16,28 +19,31 @@ pub fn stdin() {
                 buf.clear();
             }
             Err(err) => {
-                println!("error reading stdin: {}", err);
-                return;
+                println!("terminating server: failed to read stdin: {}", err);
+                process::exit(1);
             }
         }
     }
 }
 
-pub async fn tcp(state: Arc<Mutex<State>>, tcp_listener: TcpListener) {
-    while let Ok((stream, addr)) = tcp_listener.accept().await {
-        tokio::spawn(tcp::handle_connection(state.clone(), stream, addr));
+pub async fn tcp(state: Arc<Mutex<State>>, tcp_listener: TcpListener) -> String {
+    loop {
+        match tcp_listener.accept().await {
+            Ok((stream, addr)) => tokio::spawn(tcp::handle_connection(state.clone(), stream, addr)),
+            // TODO does this need to return? or can the listener continue to accept connections?
+            Err(err) => return format!("failed to accept TCP stream: {}", err),
+        };
     }
-    // TODO at least print something here? or panic?
 }
 
-pub async fn udp(state: Arc<Mutex<State>>, udp_socket: UdpSocket) {
+pub async fn udp(state: Arc<Mutex<State>>, udp_socket: UdpSocket) -> String {
     let mut buf = [0u8; CLIENT_PACKET_LEN];
     let udp_socket = Arc::new(udp_socket);
     loop {
         match udp_socket.recv_from(&mut buf).await {
             Ok((len, addr)) => {
                 if len != CLIENT_PACKET_LEN {
-                    println!("Received UDP packet of the incorrect length: {}", len);
+                    println!("{}: received UDP packet of the incorrect length: {}", addr, len);
                     continue;
                 }
                 tokio::spawn(udp::handle_packet(
@@ -47,10 +53,8 @@ pub async fn udp(state: Arc<Mutex<State>>, udp_socket: UdpSocket) {
                     addr,
                 ));
             }
-            Err(err) => {
-                println!("Error reading UDP socket: {}", err);
-                // return; // ?
-            }
+            // TODO does this need to return? or can the socket continue to receive packets?
+            Err(err) => return format!("failed to read UDP socket: {}", err),
         }
     }
 }

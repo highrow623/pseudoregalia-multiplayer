@@ -25,6 +25,7 @@
   * this can still be kinda choppy.. better would be to share more state to predict movement better in between messages
   * using a custom player controller/reusing the one from the game could be good here
 * add some time syncing? ie delay playing state for a little bit to allow more time to receive packets
+* do some graceful shutdown when the `/exit` command is executed, ie close all active connections before ending the program
 
 These will probably be done while I update the client:
 

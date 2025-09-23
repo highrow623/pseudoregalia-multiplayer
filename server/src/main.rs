@@ -1,5 +1,9 @@
 use crate::state::State;
-use std::sync::{Arc, Mutex};
+use std::{
+    process,
+    sync::{Arc, Mutex},
+    thread,
+};
 use tokio::net::{TcpListener, UdpSocket};
 
 mod serve;
@@ -13,10 +17,29 @@ async fn main() {
     println!("Server started, listening on {addr}");
 
     let state = Arc::new(Mutex::new(State::new()));
-    tokio::spawn(serve::tcp(state.clone(), tcp_listener));
-    tokio::spawn(serve::udp(state.clone(), udp_socket));
+    let tcp_task = tokio::spawn(serve::tcp(state.clone(), tcp_listener));
+    let udp_task = tokio::spawn(serve::udp(state.clone(), udp_socket));
 
-    // stdin doesn't spawn a thread so that the main thread blocks on waiting for the /exit command
-    // TODO could make main wait on all three and do some graceful shutdown if one thread ends early
-    serve::stdin();
+    // stdin gets its own thread because it requires blocking calls in order to read inputs
+    // I'm putting this in a closure in case I ever add params to serve::stdin()
+    thread::spawn(move || {
+        serve::stdin();
+    });
+
+    let reason = tokio::select! {
+        join_result = tcp_task => {
+            match join_result {
+                Ok(reason) => format!("TCP task ended: {}", reason),
+                Err(err) => format!("TCP task crashed: {}", err),
+            }
+        }
+        join_result = udp_task => {
+            match join_result {
+                Ok(reason) => format!("UDP task ended: {}", reason),
+                Err(err) => format!("UDP task crashed: {}", err),
+            }
+        }
+    };
+    println!("terminating server: {}", reason);
+    process::exit(1);
 }
