@@ -70,7 +70,7 @@ pub async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, 
     let mut buf = Vec::with_capacity(limit);
     let reason = loop {
         tokio::select! {
-            // ignore the number returned because buf is guaranteed to be empty and
+            // ignore the number returned because buf is guaranteed to be empty as
             // send_connection_updates drains all of buf
             _ = rx.recv_many(&mut buf, limit) => {
                 if let Err(err) = send_connection_updates(&mut ws_stream, &mut buf).await {
@@ -79,7 +79,7 @@ pub async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, 
             }
             msg = ws_stream.next() => {
                 let Some(msg) = msg else {
-                    break String::from("reading from stream returned None");
+                    break "stream reader closed".to_owned();
                 };
                 let msg = match msg {
                     Ok(msg) => msg,
@@ -88,7 +88,7 @@ pub async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, 
                     },
                 };
                 if msg.is_close() {
-                    break String::from("received close message");
+                    break "received close message".to_owned();
                 }
             }
         }
@@ -100,11 +100,11 @@ async fn receive_connect_message(ws_stream: &mut WebSocketStream<TcpStream>) -> 
     loop {
         // Validate message
         let Some(msg) = ws_stream.next().await else {
-            return Err(String::from("stream reader closed"));
+            return Err("stream reader closed".to_owned());
         };
         let msg = msg.map_err(|e| format!("failed to get next: {}", e))?;
         if msg.is_close() {
-            return Err(String::from("received close message"));
+            return Err("received close message".to_owned());
         }
         if !msg.is_text() && !msg.is_binary() {
             continue;
@@ -128,7 +128,8 @@ async fn send_connection_updates(
     buf: &mut Vec<ConnectionUpdate>,
 ) -> Result<(), String> {
     if buf.len() == 0 {
-        return Err(String::from("rx is closed??"));
+        // I don't think this should ever happen because rx is only dropped when we disconnect
+        return Err("rx is closed??".to_owned());
     }
     for connection_update in buf.drain(..) {
         feed_connection_update(ws_stream, connection_update).await?;

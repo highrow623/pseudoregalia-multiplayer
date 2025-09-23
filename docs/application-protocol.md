@@ -9,11 +9,11 @@ All messages are in JSON format, with a `type` field to indicate its purpose, as
 ```json
 {
   "type": "Connected",
-  "id": 1188764670,
+  "id": 11887,
   "players": [
-    578885259,
-    846393187,
-    3840177655
+    57888,
+    84639,
+    38401
   ]
 }
 ```

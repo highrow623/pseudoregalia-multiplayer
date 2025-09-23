@@ -79,9 +79,9 @@ impl State {
         }
 
         // create list of other players' ids while informing other players of this new connection
-        let mut others = Vec::with_capacity(self.players.len());
+        let mut players = Vec::with_capacity(self.players.len());
         for (player_id, player) in &self.players {
-            others.push(*player_id);
+            players.push(*player_id);
             // if the corresponding rx has been dropped, it doesn't matter that this message won't
             // get read, so we can ignore the error
             let _ = player.tx.send(ConnectionUpdate::Connected(id));
@@ -90,7 +90,7 @@ impl State {
         let (tx, rx) = mpsc::unbounded_channel();
         self.players.insert(id, Player::new(tx));
 
-        Some((id, rx, others))
+        Some((id, rx, players))
     }
 
     /// Removes the player associated with id from state and informs other players that they
@@ -109,8 +109,7 @@ impl State {
     /// Updates player state if the id exists and the state number is greater than the current.
     /// Returns true if state was updated.
     pub fn update(&mut self, id: u32, player_state: PlayerState) -> bool {
-        // should this be combined with filtered_state?
-        // and return Option<Vec<[u8; STATE_LEN]>>
+        // TODO should this be combined with filtered_state and return Option<Vec<[u8; STATE_LEN]>>?
         match self.players.get_mut(&id) {
             Some(player) => player.state.update(player_state),
             None => false,
