@@ -9,13 +9,13 @@ mod stdin;
 mod tcp;
 mod udp;
 
-pub fn stdin() {
+pub fn stdin(state: Arc<Mutex<State>>) {
     let stdin = io::stdin();
     let mut buf = String::new();
     loop {
         match stdin.read_line(&mut buf) {
             Ok(_) => {
-                stdin::handle_command(buf.trim());
+                stdin::handle_command(&state, buf.trim());
                 buf.clear();
             }
             Err(err) => {

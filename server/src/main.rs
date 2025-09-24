@@ -21,10 +21,7 @@ async fn main() {
     let udp_task = tokio::spawn(serve::udp(state.clone(), udp_socket));
 
     // stdin gets its own thread because it requires blocking calls in order to read inputs
-    // I'm putting this in a closure in case I ever add params to serve::stdin()
-    thread::spawn(move || {
-        serve::stdin();
-    });
+    thread::spawn(move || serve::stdin(state));
 
     let reason = tokio::select! {
         join_result = tcp_task => {

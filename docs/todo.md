@@ -10,6 +10,7 @@
 
 * better logging/error handling
 * update the server to handle index collisions by sending an error message and allowing the client to resend the `Connect` message
+  * also maybe try regenerating index a few times? 32 bits makes for a big id space, so not even retrying once is probably bad
 * try reconnecting to the server when an error happens instead of only on scene load
 * animations?? options to look into:
   * just use animation sequences, send a "best guess" to sync animation state
@@ -26,6 +27,10 @@
   * using a custom player controller/reusing the one from the game could be good here
 * add some time syncing? ie delay playing state for a little bit to allow more time to receive packets
 * do some graceful shutdown when the `/exit` command is executed, ie close all active connections before ending the program
+* have the server generate a key for adding HMACs to UDP packets so the UDP scheme has some measure of security
+  * pass the key to the client in the `Connected` message
+  * without encrypting, messages would still be readable by outside actors but not forgeable
+  * probably wait for ssl to add this
 
 These will probably be done while I update the client:
 
