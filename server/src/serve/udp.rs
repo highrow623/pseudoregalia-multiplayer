@@ -8,6 +8,7 @@ use tokio::net::UdpSocket;
 const MAX_STATES_PER_PACKET: usize = 11;
 const MAX_PACKET_LEN: usize = HEADER_LEN + MAX_STATES_PER_PACKET * STATE_LEN;
 const _: () = assert!(MAX_PACKET_LEN <= 508);
+const _: () = assert!(MAX_PACKET_LEN + STATE_LEN > 508);
 
 // TODO should send_to be put in a tokio::spawn()?
 pub async fn handle_packet(
