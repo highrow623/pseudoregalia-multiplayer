@@ -2,6 +2,7 @@
 
 #include "Client.hpp"
 
+#include <bit>
 #include <chrono>
 #include <codecvt>
 #include <queue>
@@ -24,25 +25,35 @@ namespace
     void OnMessage(const std::string&);
     void OnError(const std::string&);
     std::wstring ToWide(const std::string&);
-    std::string BuildUpdate();
+    uint32_t HashW(const std::wstring&);
+    int64_t ToUnrealId(const uint32_t&);
 
-    FST_PlayerInfo player_info = {};
-
-    bool connected = false;
     bool queue_connect = false;
     bool queue_disconnect = false;
     wswrap::WS* ws = nullptr;
 
-    std::optional<FST_PlayerInfo> last_sent = {};
-    std::unordered_map<std::string, FST_PlayerInfo> ghost_data = {};
+    struct Ghost
+    {
+        FST_PlayerInfo info;
+        uint32_t zone;
+        uint32_t update_num;
+        bool updated;
+    };
 
-    // TODO make this configurable?
-    const auto MS_PER_UPDATE = std::chrono::milliseconds(20);
-    std::optional<std::chrono::steady_clock::time_point> last_send_time = {};
+    uint32_t current_zone;
+    std::optional<FST_PlayerInfo> player_info = {};
+
+    // the id given in the Connected message; this value being defined means a full connection has been established
+    std::optional<uint32_t> id = {};
+    std::unordered_map<uint32_t, Ghost> ghosts = {};
+    std::unordered_set<uint32_t> spawned_ghosts = {};
 }
 
 void Client::OnSceneLoad(std::wstring level)
 {
+    // we clear spawned_ghosts here because being in a new scene means they're all gone anyway
+    spawned_ghosts.clear();
+    current_zone = HashW(level);
     if (level == L"TitleScreen" || level == L"EndScreen")
     {
         queue_disconnect = true;
@@ -61,10 +72,9 @@ void Client::Tick()
         {
             delete ws;
             ws = nullptr;
-            last_sent.reset();
-            last_send_time.reset();
-            ghost_data.clear();
-            connected = false;
+            id.reset();
+            ghosts.clear();
+            // don't clear spawned_ghosts because we need to tell the bp mod to delete the actors
         }
         queue_disconnect = false;
     }
@@ -84,34 +94,9 @@ void Client::Tick()
         }
         queue_connect = false;
     }
-    if (ws && connected)
+    if (id && player_info)
     {
-        bool send_update = false;
-        // This implementation calculates whether to send an update based on the timestamp of the last update sent,
-        // which means update frequency depends on the rate at which this function is called. In other words, if
-        // MS_PER_UPDATE is set to 50, an update won't happen sooner than 50ms, but the extra time above 50ms is not
-        // taken into account for the next update.
-        if (last_send_time)
-        {
-            auto now = std::chrono::steady_clock::now();
-            std::chrono::duration<double> since_last = now - *last_send_time;
-            auto ms_since_last = std::chrono::duration_cast<std::chrono::milliseconds>(since_last);
-            if (ms_since_last >= MS_PER_UPDATE)
-            {
-                send_update = true;
-                last_send_time = now;
-            }
-        }
-        else
-        {
-            send_update = true;
-            last_send_time = std::chrono::steady_clock::now();
-        }
-        if (send_update)
-        {
-            std::string update = BuildUpdate();
-            ws->send_text(update);
-        }
+        // TODO send UDP update
     }
     if (ws)
     {
@@ -124,11 +109,31 @@ void Client::SetPlayerInfo(const FST_PlayerInfo& info)
     player_info = info;
 }
 
-void Client::GetGhostInfo(RC::Unreal::TArray<FST_PlayerInfo>& ghost_info)
+void Client::GetGhostInfo(RC::Unreal::TArray<FST_PlayerInfo>& ghost_info, RC::Unreal::TArray<int64_t>& to_remove)
 {
-    for (const auto& [_, ghost] : ghost_data)
+    for (auto& [id, ghost] : ghosts)
     {
-        ghost_info.Add(ghost);
+        if (!ghost.updated || ghost.zone != current_zone)
+        {
+            continue;
+        }
+
+        ghost_info.Add(ghost.info);
+        spawned_ghosts.insert(id);
+        ghost.updated = false;
+    }
+
+    for (auto it = spawned_ghosts.begin(); it != spawned_ghosts.end(); )
+    {
+        if (!ghosts.contains(*it) || ghosts.at(*it).zone != current_zone)
+        {
+            to_remove.Add(ToUnrealId(*it));
+            it = spawned_ghosts.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
     }
 }
 
@@ -137,8 +142,11 @@ namespace
 
 void OnOpen()
 {
-    Log(L"Connected to server", LogType::Loud);
-    connected = true;
+    Log(L"WebSocket connection established", LogType::Loud);
+    nlohmann::json j = {
+        {"type", "Connect"},
+    };
+    ws->send_text(j.dump());
 }
 
 void OnClose()
@@ -156,100 +164,108 @@ void OnMessage(const std::string& message)
         return;
     }
 
-    std::unordered_set<std::string> keys = {};
-    for (nlohmann::json::const_iterator iter = j.begin(); iter != j.end(); iter++)
+    if (!j.contains("type"))
     {
-        const auto& key = iter.key();
-        const auto& value = iter.value();
-        if (!value.is_object())
-        {
-            Log(L"Received non-object value for ghost " + ToWide(key), LogType::Warning);
-            continue;
-        }
-        keys.insert(key);
-        if (ghost_data.contains(key))
-        {
-            auto& ghost = ghost_data.at(key);
-            if (value.contains("zo"))
-            {
-                ghost.zone = RC::Unreal::FString(ToWide(value["zo"]).c_str());
-            }
-            if (value.contains("lx"))
-            {
-                ghost.location_x = value["lx"];
-            }
-            if (value.contains("ly"))
-            {
-                ghost.location_y = value["ly"];
-            }
-            if (value.contains("lz"))
-            {
-                ghost.location_z = value["lz"];
-            }
-            if (value.contains("rx"))
-            {
-                ghost.rotation_x = value["rx"];
-            }
-            if (value.contains("ry"))
-            {
-                ghost.rotation_y = value["ry"];
-            }
-            if (value.contains("rz"))
-            {
-                ghost.rotation_z = value["rz"];
-            }
-            if (value.contains("sx"))
-            {
-                ghost.scale_x = value["sx"];
-            }
-            if (value.contains("sy"))
-            {
-                ghost.scale_y = value["sy"];
-            }
-            if (value.contains("sz"))
-            {
-                ghost.scale_z = value["sz"];
-            }
-        }
-        else
-        {
-            if (!value.contains("zo")
-                || !value.contains("lx")
-                || !value.contains("ly")
-                || !value.contains("lz")
-                || !value.contains("rx")
-                || !value.contains("ry")
-                || !value.contains("rz")
-                || !value.contains("sx")
-                || !value.contains("sy")
-                || !value.contains("sz"))
-            {
-                Log(L"Received initial data with missing fields for ghost " + ToWide(key), LogType::Warning);
-                continue;
-            }
-            ghost_data[key] = FST_PlayerInfo{
-                .zone = RC::Unreal::FString(ToWide(value["zo"]).c_str()),
-                .location_x = value["lx"],
-                .location_y = value["ly"],
-                .location_z = value["lz"],
-                .rotation_x = value["rx"],
-                .rotation_y = value["ry"],
-                .rotation_z = value["rz"],
-                .scale_x = value["sx"],
-                .scale_y = value["sy"],
-                .scale_z = value["sz"],
-            };
-        }
+        Log(L"Received message with no type field: " + ToWide(message), LogType::Warning);
+        return;
     }
-    for (auto iter = ghost_data.cbegin(); iter != ghost_data.cend();)
+
+    if (!j["type"].is_string())
     {
-        if (!keys.contains(iter->first))
+        Log(L"Received message with non-string type field: " + ToWide(message), LogType::Warning);
+        return;
+    }
+
+    if (j["type"] == "Connected")
+    {
+        // set this here in case we return early
+        queue_disconnect = true;
+
+        if (id)
         {
-            iter = ghost_data.erase(iter);
+            Log(L"Received Connected message after connection was already established");
+            return;
         }
-        else {
-            iter++;
+
+        if (!j.contains("id"))
+        {
+            Log(L"Received Connected message with no id field: " + ToWide(message), LogType::Warning);
+            return;
         }
+
+        if (!j["id"].is_number_unsigned())
+        {
+            Log(L"Received Connected message with invalid id field: " + ToWide(message), LogType::Warning);
+            return;
+        }
+
+        if (!j.contains("players"))
+        {
+            Log(L"Received Connected message with no players field: " + ToWide(message), LogType::Warning);
+            return;
+        }
+
+        if (!j["players"].is_array())
+        {
+            Log(L"Received Connected message with non-array players field: " + ToWide(message), LogType::Warning);
+            return;
+        }
+
+        for (auto it = j["players"].begin(); it != j["players"].end(); ++it)
+        {
+            if (!it->is_number_unsigned())
+            {
+                Log(L"Received Connected message with invalid player id: " + ToWide(message), LogType::Warning);
+                return;
+            }
+
+            auto player_id = it->template get<uint32_t>();
+            ghosts[player_id]; // using the [] operator will add the key to the map with a default Ghost value
+        }
+ 
+        id = j["id"].template get<uint32_t>();
+        queue_disconnect = false;
+        Log(L"Received Connected message with player id " + std::to_wstring(*id), LogType::Loud);
+    }
+    else if (j["type"] == "PlayerJoined")
+    {
+        if (!j.contains("id"))
+        {
+            Log(L"Received PlayerJoined message with no id field: " + ToWide(message), LogType::Warning);
+            return;
+        }
+
+        if (!j["id"].is_number_unsigned())
+        {
+            Log(L"Received PlayerJoined message with invalid id field: " + ToWide(message), LogType::Warning);
+            return;
+        }
+
+        auto player_id = j["id"].template get<uint32_t>();
+        ghosts[player_id]; // using the [] operator will add the key to the map with a default Ghost value
+        Log(L"Received PlayerJoined message with id " + std::to_wstring(player_id), LogType::Loud);
+    }
+    else if (j["type"] == "PlayerLeft")
+    {
+        if (!j.contains("id"))
+        {
+            Log(L"Received PlayerLeft message with no id field: " + ToWide(message), LogType::Warning);
+            return;
+        }
+
+        if (!j["id"].is_number_unsigned())
+        {
+            Log(L"Received PlayerLeft message with invalid id field: " + ToWide(message), LogType::Warning);
+            return;
+        }
+
+        auto player_id = j["id"].template get<uint32_t>();
+        ghosts.erase(player_id);
+        Log(L"Received PlayerLeft message with id " + std::to_wstring(player_id), LogType::Loud);
+    }
+    else
+    {
+        Log(L"Received message with unknown type: " + ToWide(j["type"]), LogType::Warning);
     }
 }
 
@@ -264,77 +280,30 @@ std::wstring ToWide(const std::string& input)
     return converter.from_bytes(input);
 }
 
-std::string BuildUpdate()
+// Performs the 32-bit FNV-1a hash function on the input wstring.
+uint32_t HashW(const std::wstring& str)
 {
-    nlohmann::json j = nlohmann::json::object();
-    if (last_sent)
+    static_assert(sizeof(wchar_t) == 2);
+
+    uint32_t result = 0x911c9dc5; // 32-bit FNV offset basis
+    for (wchar_t wc : str)
     {
-        if (last_sent->zone != player_info.zone)
-        {
-            j["zo"] = player_info.zone.GetCharArray();
-            last_sent->zone = player_info.zone;
-        }
-        if (last_sent->location_x != player_info.location_x)
-        {
-            j["lx"] = player_info.location_x;
-            last_sent->location_x = player_info.location_x;
-        }
-        if (last_sent->location_y != player_info.location_y)
-        {
-            j["ly"] = player_info.location_y;
-            last_sent->location_y = player_info.location_y;
-        }
-        if (last_sent->location_z != player_info.location_z)
-        {
-            j["lz"] = player_info.location_z;
-            last_sent->location_z = player_info.location_z;
-        }
-        if (last_sent->rotation_x != player_info.rotation_x)
-        {
-            j["rx"] = player_info.rotation_x;
-            last_sent->rotation_x = player_info.rotation_x;
-        }
-        if (last_sent->rotation_y != player_info.rotation_y)
-        {
-            j["ry"] = player_info.rotation_y;
-            last_sent->rotation_y = player_info.rotation_y;
-        }
-        if (last_sent->rotation_z != player_info.rotation_z)
-        {
-            j["rz"] = player_info.rotation_z;
-            last_sent->rotation_z = player_info.rotation_z;
-        }
-        if (last_sent->scale_x != player_info.scale_x)
-        {
-            j["sx"] = player_info.scale_x;
-            last_sent->scale_x = player_info.scale_x;
-        }
-        if (last_sent->scale_y != player_info.scale_y)
-        {
-            j["sy"] = player_info.scale_y;
-            last_sent->scale_y = player_info.scale_y;
-        }
-        if (last_sent->scale_z != player_info.scale_z)
-        {
-            j["sz"] = player_info.scale_z;
-            last_sent->scale_z = player_info.scale_z;
-        }
+        // since wchar_t is 2 bytes wide, we must put each byte into the hash individually
+        auto b1 = uint8_t(wc >> 8);
+        result ^= b1;
+        result *= 0x01000193; // 32-bit FNV prime
+
+        auto b2 = uint8_t(wc);
+        result ^= b2;
+        result *= 0x01000193; // 32-bit FNV prime
     }
-    else
-    {
-        j["zo"] = player_info.zone.GetCharArray();
-        j["lx"] = player_info.location_x;
-        j["ly"] = player_info.location_y;
-        j["lz"] = player_info.location_z;
-        j["rx"] = player_info.rotation_x;
-        j["ry"] = player_info.rotation_y;
-        j["rz"] = player_info.rotation_z;
-        j["sx"] = player_info.scale_x;
-        j["sy"] = player_info.scale_y;
-        j["sz"] = player_info.scale_z;
-        last_sent = player_info;
-    }
-    return j.dump();
+    return result;
+}
+
+// converts a uint32_t into an int64_t with the same value
+int64_t ToUnrealId(const uint32_t& id)
+{
+    return std::bit_cast<int64_t>(uint64_t(id));
 }
 
 } // namespace

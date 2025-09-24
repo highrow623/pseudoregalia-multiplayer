@@ -1,6 +1,3 @@
-// My method of converting std::string to std::wstring is deprecated but it works for what I need to do
-#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
-
 #include <Mod/CppUserModBase.hpp>
 
 #include "Unreal/AActor.hpp"
@@ -73,16 +70,21 @@ public:
     static void sync_ghost_info(RC::Unreal::UnrealScriptFunctionCallableContext& context, void* customdata)
     {
         RC::Unreal::TArray<FST_PlayerInfo> ghost_info{};
-        Client::GetGhostInfo(ghost_info);
+        RC::Unreal::TArray<int64_t> to_remove{};
+        Client::GetGhostInfo(ghost_info, to_remove);
 
-        // TODO if I can figure out setting return values, I'd rather do that than calling UpdateGhosts directly
         RC::Unreal::UFunction* update_ghosts = context.Context->GetFunctionByName(L"UpdateGhosts");
         if (!update_ghosts)
         {
             Log(L"Could not find function \"UpdateGhosts\" in \"BP_PM_Manager_C\"", LogType::Error);
             return;
         }
-        std::shared_ptr<void> params = std::make_shared<RC::Unreal::TArray<FST_PlayerInfo>>(ghost_info);
+        struct UpdateGhostsParams
+        {
+            RC::Unreal::TArray<FST_PlayerInfo> ghost_info;
+            RC::Unreal::TArray<int64_t> to_remove;
+        };
+        std::shared_ptr<void> params = std::make_shared<UpdateGhostsParams>(ghost_info, to_remove);
         context.Context->ProcessEvent(update_ghosts, params.get());
     }
 };

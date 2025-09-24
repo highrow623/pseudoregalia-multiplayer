@@ -31,6 +31,7 @@
   * pass the key to the client in the `Connected` message
   * without encrypting, messages would still be readable by outside actors but not forgeable
   * probably wait for ssl to add this
+* use JSON schema in cpp mod instead of parsing for errors manually
 
 These will probably be done while I update the client:
 
