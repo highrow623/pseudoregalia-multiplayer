@@ -55,11 +55,11 @@ The `PlayerLeft` message is sent when a connected player disconnects from the se
 
 ## Client to Server Packets
 
-After establishing a WebSocket connection and receiving a `Connected` packet, clients send a UDP packet every frame to inform the server of their current state. The update is 52 bytes long and has the following format:
+After establishing a WebSocket connection and receiving a `Connected` packet, clients send a UDP packet every frame to inform the server of their current state. The update is 48 bytes long and has the following format:
 
 * Update number (unsigned 32-bit integer, 4 bytes): since UDP packets can arrive out of order, this is used by the server to determine whether to accept an update. A value of 0 is used by the server to indicate an update has not arrived yet for this player, so the first update the client sends has an update number of 1. Each time the client sends a packet, it increments the update number by 1.
 * Player id (unsigned 32-bit integer, 4 bytes): the id of the player that was received in the `Connected` packet. The server rejects the packet if the id does not match a connected player.
-* Zone (unsigned 64-bit integer, 8 bytes): a hash of the zone the player is in. The hash is calculated client-side and used by the client to determine whether another player is in the same zone.
+* Zone (unsigned 32-bit integer, 4 bytes): a hash of the zone the player is in. The hash is calculated client-side and used by the client to determine whether another player is in the same zone.
 * Transform: 
   * Location: the location component of the player's transform, represented by three 32-bit floating point numbers.
     * x coordinate (32-bit IEEE 754 floating point number, 4 bytes)
@@ -75,14 +75,14 @@ Notes:
 
 ## Server to Client Packets
 
-Once an update is accepted by the server, the server sends one or more UDP packets with the current state of other connected players. An update is `4 + 48 * num_updates` bytes long and has the following format:
+Once an update is accepted by the server, the server sends one or more UDP packets with the current state of other connected players. An update is `4 + 44 * num_updates` bytes long and has the following format:
 
 * Update number (unsigned 32-bit integer, 4 bytes): when the server responds to an accepted update, it uses the same update number in the response.
-* Player updates (48 bytes each): Each contiguous set of 48 bytes after the first 4 contain the state for another connected player. These 48 bytes are in the same format as the player update, from player id to transform.
+* Player updates (44 bytes each): Each contiguous set of 44 bytes after the first 4 contain the state for another connected player. These 44 bytes are in the same format as the player update, from player id to transform.
 
 Notes:
 
-* `num_updates` will always be between 1 and 10, inclusive. So an update will have minimum length 52 and maximum length 484, and the length of an update mod 48 will always be 4.
-* If the server has to send more than 10 players' worth of updates, it will send multiple packets.
+* `num_updates` will always be between 1 and 11, inclusive. So an update will have minimum length 48 and maximum length 488, and the length of an update mod 44 will always be 4.
+* If the server has to send more than 11 players' worth of updates, it will send multiple packets.
 
 The client keeps track of the highest update number received for each connected player. Similar to the server, the client only accepts an update for a player if the update number is greater than the one stored for that player. The update number in the packet applies to each player in the update.

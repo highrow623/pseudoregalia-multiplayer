@@ -5,7 +5,7 @@ use std::{
 };
 use tokio::net::UdpSocket;
 
-const MAX_STATES_PER_PACKET: usize = 10;
+const MAX_STATES_PER_PACKET: usize = 11;
 const MAX_PACKET_LEN: usize = HEADER_LEN + MAX_STATES_PER_PACKET * STATE_LEN;
 const _: () = assert!(MAX_PACKET_LEN <= 508);
 

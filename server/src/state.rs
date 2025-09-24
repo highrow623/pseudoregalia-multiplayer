@@ -4,7 +4,7 @@ use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 pub const HEADER_LEN: usize = 4;
 const ID_LEN: usize = 4;
-pub const STATE_LEN: usize = 48;
+pub const STATE_LEN: usize = 44;
 pub const CLIENT_PACKET_LEN: usize = HEADER_LEN + STATE_LEN;
 
 pub struct PlayerState {
