@@ -50,6 +50,7 @@ pub async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, 
         println!("{}: failed to receive connect message: {}", addr, err);
         return;
     }
+    println!("{}: received Connect message", addr);
 
     let Some((id, mut rx, players)) = state.lock().unwrap().connect() else {
         // TODO send an error message to the client and allow them to try again
