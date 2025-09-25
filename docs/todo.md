@@ -3,6 +3,8 @@
 ## For initial release
 
 * update client to use the new application protocol, test
+* use JSON schema in cpp mod instead of parsing for errors manually
+* try reconnecting to the server when an error happens instead of only on scene load
 * finish writing docs
 * add license
 
@@ -11,7 +13,6 @@
 * better logging/error handling
 * update the server to handle index collisions by sending an error message and allowing the client to resend the `Connect` message
   * also maybe try regenerating index a few times? 32 bits makes for a big id space, so not even retrying once is probably bad
-* try reconnecting to the server when an error happens instead of only on scene load
 * animations?? options to look into:
   * just use animation sequences, send a "best guess" to sync animation state
   * reuse animation bp or player controller, sync whatever data is needed for animations
@@ -31,11 +32,3 @@
   * pass the key to the client in the `Connected` message
   * without encrypting, messages would still be readable by outside actors but not forgeable
   * probably wait for ssl to add this
-* use JSON schema in cpp mod instead of parsing for errors manually
-
-These will probably be done while I update the client:
-
-* make the "message send timeout" calculate correctly?
-  * this won't matter if I use UDP for updates, because I'll send an update every frame
-* have AddGhostData return the list of ghost ids to remove so that BP_PM_Manager.UpdateGhosts doesn't have to recalculate that
-  * this could also just be in the message from the server so the client doesn't have to calculate it at all?
