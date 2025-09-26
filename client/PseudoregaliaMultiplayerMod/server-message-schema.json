@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$defs": {
+    "u32": {
+      "description": "An unsigned 32-bit integer",
+      "type": "integer",
+      "minimum": 0,
+      "exclusiveMaximum": 4294967296
+    },
+    "message": {
+      "connected": {
+        "properties": {
+          "type": {},
+          "id": { "$ref": "#/$defs/u32" },
+          "players": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/u32" }
+          }
+        },
+        "required": ["id", "players"],
+        "additionalProperties": false
+      },
+      "playerJoinedOrLeft": {
+        "properties": {
+          "type": {},
+          "id": { "$ref": "#/$defs/u32" }
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "type": "object",
+  "properties": {
+    "type": {
+      "enum": [
+        "Connected",
+        "PlayerJoined",
+        "PlayerLeft"
+      ]
+    }
+  },
+  "required": ["type"],
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "Connected" } } },
+      "then": { "$ref": "#/$defs/message/connected" }
+    },
+    {
+      "if": { "properties": { "type": { "const": "PlayerJoined" } } },
+      "then": { "$ref": "#/$defs/message/playerJoinedOrLeft" }
+    },
+    {
+      "if": { "properties": { "type": { "const": "PlayerLeft" } } },
+      "then": { "$ref": "#/$defs/message/playerJoinedOrLeft" }
+    }
+  ]
+}

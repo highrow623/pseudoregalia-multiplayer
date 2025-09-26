@@ -13,6 +13,7 @@
 namespace
 {
     void ParseSetting(std::string&, toml::table, const std::string&);
+    void ParseSetting(uint16_t&, toml::table, const std::string&);
     std::wstring ToWide(const std::string&);
 
     // if you run from the executable directory
@@ -20,7 +21,8 @@ namespace
     // if you run from the game directory
     const std::string settings_filename2 = "pseudoregalia/Binaries/Win64/" + settings_filename1;
 
-    std::string uri = "ws://127.0.0.1:8080";
+    std::string address = "127.0.0.1";
+    uint16_t port = 8080;
 }
 
 void Settings::Load()
@@ -31,7 +33,7 @@ void Settings::Load()
         settings_file = std::ifstream(settings_filename2);
         if (!settings_file.good())
         {
-            Log(L"Settings file not found, using default settings");
+            Log(L"Settings file not found, using default settings", LogType::Warning);
             return;
         }
     }
@@ -43,18 +45,23 @@ void Settings::Load()
     }
     catch (const toml::parse_error& err)
     {
-        Log(L"Failed to parse settings: " + ToWide(err.what()));
-        Log(L"Using default settings");
+        Log(L"Failed to parse settings: " + ToWide(err.what()) + L"; using default settings", LogType::Warning);
         return;
     }
 
-    Log(L"Loading settings");
-    ParseSetting(uri, settings_table, "uri");
+    Log(L"Loading settings", LogType::Loud);
+    ParseSetting(address, settings_table, "server.address");
+    ParseSetting(port, settings_table, "server.port");
 }
 
-const std::string& Settings::GetURI()
+const std::string& Settings::GetAddress()
 {
-    return uri;
+    return address;
+}
+
+const uint16_t& Settings::GetPort()
+{
+    return port;
 }
 
 namespace
@@ -69,7 +76,20 @@ void ParseSetting(std::string& setting, toml::table settings_table, const std::s
         return;
     }
 
-    Log(ToWide(setting_path + " = " + *option));
+    Log(ToWide(setting_path + " = \"" + *option + "\""));
+    setting = *option;
+}
+
+void ParseSetting(uint16_t& setting, toml::table settings_table, const std::string& setting_path)
+{
+    std::optional<uint16_t> option = settings_table.at_path(setting_path).value<uint16_t>();
+    if (!option)
+    {
+        Log(ToWide(setting_path) + L" = default (setting missing or not a number)");
+        return;
+    }
+
+    Log(ToWide(setting_path + " = " + std::to_string(*option)));
     setting = *option;
 }
 

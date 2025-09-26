@@ -5,5 +5,6 @@
 namespace Settings
 {
     void Load();
-    const std::string& GetURI();
+    const std::string& GetAddress();
+    const uint16_t& GetPort();
 }

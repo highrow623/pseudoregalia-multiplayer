@@ -17,6 +17,7 @@
 
 #include "Logger.hpp"
 #include "Settings.hpp"
+#include "UdpSocket.hpp"
 
 namespace
 {
@@ -24,13 +25,23 @@ namespace
     void OnClose();
     void OnMessage(const std::string&);
     void OnError(const std::string&);
+
+    void OnRecv(const boost::array<uint8_t, 512>&, size_t);
+    void OnErr(const std::string&);
+
     std::wstring ToWide(const std::string&);
     uint32_t HashW(const std::wstring&);
     int64_t ToUnrealId(const uint32_t&);
 
+    void SerializeU32(uint32_t, boost::array<uint8_t, 48>&, size_t&);
+    void SerializeF32(float, boost::array<uint8_t, 48>&, size_t&);
+    uint32_t DeserializeU32(const boost::array<uint8_t, 512>&, size_t&);
+    float DeserializeF32(const boost::array<uint8_t, 512>&, size_t&);
+
     bool queue_connect = false;
     bool queue_disconnect = false;
     wswrap::WS* ws = nullptr;
+    UdpSocket::UdpSocket<48, 512>* udp = nullptr;
 
     struct Ghost
     {
@@ -45,6 +56,7 @@ namespace
 
     // the id given in the Connected message; this value being defined means a full connection has been established
     std::optional<uint32_t> id = {};
+    uint32_t update_num = 0;
     std::unordered_map<uint32_t, Ghost> ghosts = {};
     std::unordered_set<uint32_t> spawned_ghosts = {};
 }
@@ -72,7 +84,10 @@ void Client::Tick()
         {
             delete ws;
             ws = nullptr;
+            delete udp;
+            udp = nullptr;
             id.reset();
+            update_num = 0;
             ghosts.clear();
             // don't clear spawned_ghosts because we need to tell the bp mod to delete the actors
         }
@@ -84,11 +99,16 @@ void Client::Tick()
         {
             try
             {
-                ws = new wswrap::WS(Settings::GetURI(), OnOpen, OnClose, OnMessage, OnError);
+                const auto& address = Settings::GetAddress();
+                const auto& port = Settings::GetPort();
+                auto uri = "ws://" + address + ":" + std::to_string(port);
+                ws = new wswrap::WS(uri, OnOpen, OnClose, OnMessage, OnError);
+                udp = new UdpSocket::UdpSocket<48, 512>(address, port, OnRecv, OnErr);
             }
             catch (const std::exception& ex)
             {
                 ws = nullptr;
+                udp = nullptr;
                 Log(L"Error connecting: " + ToWide(ex.what()), LogType::Error);
             }
         }
@@ -96,11 +116,27 @@ void Client::Tick()
     }
     if (id && player_info)
     {
-        // TODO send UDP update
+        boost::array<uint8_t, 48> buf{};
+        update_num++;
+        size_t pos = 0;
+        SerializeU32(update_num, buf, pos);
+        SerializeU32(*id, buf, pos);
+        SerializeU32(current_zone, buf, pos);
+        SerializeF32(float(player_info->location_x), buf, pos);
+        SerializeF32(float(player_info->location_y), buf, pos);
+        SerializeF32(float(player_info->location_z), buf, pos);
+        SerializeF32(float(player_info->rotation_x), buf, pos);
+        SerializeF32(float(player_info->rotation_y), buf, pos);
+        SerializeF32(float(player_info->rotation_z), buf, pos);
+        SerializeF32(float(player_info->scale_x), buf, pos);
+        SerializeF32(float(player_info->scale_y), buf, pos);
+        SerializeF32(float(player_info->scale_z), buf, pos);
+        udp->Send(buf);
     }
     if (ws)
     {
         ws->poll();
+        udp->Poll();
     }
 }
 
@@ -220,7 +256,7 @@ void OnMessage(const std::string& message)
             }
 
             auto player_id = it->template get<uint32_t>();
-            ghosts[player_id]; // using the [] operator will add the key to the map with a default Ghost value
+            ghosts[player_id] = Ghost{ .info = FST_PlayerInfo{ .id = ToUnrealId(player_id) } };
         }
  
         id = j["id"].template get<uint32_t>();
@@ -242,7 +278,7 @@ void OnMessage(const std::string& message)
         }
 
         auto player_id = j["id"].template get<uint32_t>();
-        ghosts[player_id]; // using the [] operator will add the key to the map with a default Ghost value
+        ghosts[player_id] = Ghost{ .info = FST_PlayerInfo{ .id = ToUnrealId(player_id) } };
         Log(L"Received PlayerJoined message with id " + std::to_wstring(player_id), LogType::Loud);
     }
     else if (j["type"] == "PlayerLeft")
@@ -271,7 +307,53 @@ void OnMessage(const std::string& message)
 
 void OnError(const std::string& error_message)
 {
-    Log(L"Error: " + ToWide(error_message), LogType::Error);
+    Log(L"WebSocket error: " + ToWide(error_message), LogType::Error);
+}
+
+void OnRecv(const boost::array<uint8_t, 512>& buf, size_t len)
+{
+    if (len < 48 || len > 488 || len % 44 != 4)
+    {
+        Log(L"Received packet of invalid size " + std::to_wstring(len), LogType::Warning);
+        return;
+    }
+
+    size_t pos = 0;
+    uint32_t update_num = DeserializeU32(buf, pos);
+    size_t num_updates = (len - 4) / 44;
+    for (size_t i = 0; i < num_updates; i++)
+    {
+        pos = 4 + i * 44;
+        uint32_t player_id = DeserializeU32(buf, pos);
+        if (!ghosts.contains(player_id))
+        {
+            continue;
+        }
+
+        auto& ghost = ghosts.at(player_id);
+        if (update_num <= ghost.update_num)
+        {
+            continue;
+        }
+
+        ghost.zone = DeserializeU32(buf, pos);
+        ghost.info.location_x = double(DeserializeF32(buf, pos));
+        ghost.info.location_y = double(DeserializeF32(buf, pos));
+        ghost.info.location_z = double(DeserializeF32(buf, pos));
+        ghost.info.rotation_x = double(DeserializeF32(buf, pos));
+        ghost.info.rotation_y = double(DeserializeF32(buf, pos));
+        ghost.info.rotation_z = double(DeserializeF32(buf, pos));
+        ghost.info.scale_x = double(DeserializeF32(buf, pos));
+        ghost.info.scale_y = double(DeserializeF32(buf, pos));
+        ghost.info.scale_z = double(DeserializeF32(buf, pos));
+        ghost.update_num = update_num;
+        ghost.updated = true;
+    }
+}
+
+void OnErr(const std::string& error_message)
+{
+    Log(L"UDP error: " + ToWide(error_message), LogType::Error);
 }
 
 std::wstring ToWide(const std::string& input)
@@ -304,6 +386,45 @@ uint32_t HashW(const std::wstring& str)
 int64_t ToUnrealId(const uint32_t& id)
 {
     return std::bit_cast<int64_t>(uint64_t(id));
+}
+
+// Serializes src into 4 bytes of buf starting at pos and increments pos by 4.
+void SerializeU32(uint32_t src, boost::array<uint8_t, 48>& buf, size_t& pos)
+{
+    buf[pos + 3] = uint8_t(src);
+    for (int i = 2; i >= 0; i--)
+    {
+        src >>= 8;
+        buf[pos + i] = uint8_t(src);
+    }
+    pos += 4;
+}
+
+// Serializes src into 4 bytes of buf starting at pos and increments pos by 4.
+void SerializeF32(float src, boost::array<uint8_t, 48>& buf, size_t& pos)
+{
+    uint32_t src_bits = std::bit_cast<uint32_t>(src);
+    SerializeU32(src_bits, buf, pos);
+}
+
+// Derializes 4 bytes of buf into a uint32_t starting at pos and increments pos by 4.
+uint32_t DeserializeU32(const boost::array<uint8_t, 512>& buf, size_t& pos)
+{
+    uint32_t result = buf[pos];
+    for (int i = 1; i < 4; i++)
+    {
+        result <<= 8;
+        result |= buf[pos + i];
+    }
+    pos += 4;
+    return result;
+}
+
+// Derializes 4 bytes of buf into a float starting at pos and increments pos by 4.
+float DeserializeF32(const boost::array<uint8_t, 512>& buf, size_t& pos)
+{
+    uint32_t bits = DeserializeU32(buf, pos);
+    return std::bit_cast<float>(bits);
 }
 
 } // namespace

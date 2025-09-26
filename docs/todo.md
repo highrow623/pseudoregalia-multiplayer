@@ -2,14 +2,14 @@
 
 ## For initial release
 
-* update client to use the new application protocol, test
-* use JSON schema in cpp mod instead of parsing for errors manually
 * try reconnecting to the server when an error happens instead of only on scene load
 * finish writing docs
 * add license
 
 ## Other
 
+* use JSON schema in cpp mod instead of parsing for errors manually?
+  * I've got the schema at client/PseudoregaliaMultiplayerMod/server-message-schema.json if I end up wanting to use it
 * better logging/error handling
 * update the server to handle index collisions by sending an error message and allowing the client to resend the `Connect` message
   * also maybe try regenerating index a few times? 32 bits makes for a big id space, so not even retrying once is probably bad
