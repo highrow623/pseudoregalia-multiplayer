@@ -2,6 +2,8 @@
 
 Communication between client and server consists of both WebSocket messages and UDP packets. The client first establishes a WebSocket connection, which the server uses to send important but less frequent updates. The client and server then trade UDP packets with the frame-by-frame data to sync state.
 
+I've decided to go with this for now because I like using UDP for the state updates, but I didn't want to write my own "connection based, in order, guaranteed delivery" protocol on top of UDP. I can get that from WebSockets relatively easily (from a dev perspective anyway).
+
 # WebSocket Scheme
 
 All messages are in JSON format, with a `type` field to indicate its purpose, as well as any other fields specific to that message type. For example, a `Connected` packet (described below) might look like this:
