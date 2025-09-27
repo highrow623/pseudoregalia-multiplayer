@@ -21,9 +21,9 @@
 
 namespace
 {
-    const size_t HEADER_LEN = 8;
-    const size_t STATE_LEN = 16;
-    const size_t MAX_STATES_PER_PACKET = 31;
+    const size_t HEADER_LEN = 4;
+    const size_t STATE_LEN = 20;
+    const size_t MAX_STATES_PER_PACKET = 25;
     const size_t MIN_SERVER_PACKET_LEN = HEADER_LEN + STATE_LEN;
     const size_t MAX_SERVER_PACKET_LEN = HEADER_LEN + MAX_STATES_PER_PACKET * STATE_LEN;
 
@@ -135,8 +135,8 @@ void Client::Tick()
         update_num++;
         size_t pos = 0;
         SerializeU32(update_num, buf, pos);
-        SerializeU32(current_zone, buf, pos);
         SerializeU8(*id, buf, pos);
+        SerializeU32(current_zone, buf, pos);
         SerializeLocator(player_info->location_x, buf, pos);
         SerializeLocator(player_info->location_y, buf, pos);
         SerializeLocator(player_info->location_z, buf, pos);
@@ -161,17 +161,12 @@ void Client::GetGhostInfo(RC::Unreal::TArray<FST_PlayerInfo>& ghost_info, RC::Un
 {
     for (auto& [id, ghost] : ghosts)
     {
-        if (!ghost.updated)
+        if (!ghost.updated || ghost.zone != current_zone)
         {
             continue;
         }
 
         ghost.updated = false;
-        if (ghost.zone != current_zone)
-        {
-            continue;
-        }
-
         ghost_info.Add(ghost.info);
         spawned_ghosts.insert(id);
     }
@@ -384,12 +379,6 @@ void OnRecv(const boost::array<uint8_t, RECV>& buf, size_t len)
 
     size_t pos = 0;
     uint32_t update_num = DeserializeU32(buf, pos);
-    uint32_t zone = DeserializeU32(buf, pos);
-    if (zone != current_zone)
-    {
-        return;
-    }
-
     size_t num_updates = (len - HEADER_LEN) / STATE_LEN;
     for (size_t i = 0; i < num_updates; i++)
     {
@@ -397,12 +386,12 @@ void OnRecv(const boost::array<uint8_t, RECV>& buf, size_t len)
         if (!ghosts.contains(player_id) || ghosts.at(player_id).update_num >= update_num)
         {
             // skip pos ahead the bytes it would have read for this player
-            pos += 15;
+            pos += 19;
             continue;
         }
 
         auto& ghost = ghosts.at(player_id);
-        ghost.zone = zone;
+        ghost.zone = DeserializeU32(buf, pos);
         ghost.info.location_x = DeserializeLocator(buf, pos);
         ghost.info.location_y = DeserializeLocator(buf, pos);
         ghost.info.location_z = DeserializeLocator(buf, pos);
@@ -513,7 +502,7 @@ float DeserializeF32(const boost::array<uint8_t, RECV>& buf, size_t& pos)
     return std::bit_cast<float>(bits);
 }
 
-// Deserializes 4 bytes of buf into a float starting at posts and increments pos by 4, then casts the float to a double.
+// Deserializes 4 bytes of buf into a float starting at pos and increments pos by 4, then casts the float to a double.
 double DeserializeLocator(const boost::array<uint8_t, RECV>& buf, size_t& pos)
 {
     return double(DeserializeF32(buf, pos));

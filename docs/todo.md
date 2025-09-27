@@ -2,8 +2,6 @@
 
 ## For initial release
 
-* fix zone issue (will have to update protocol again)
-  * could also just keep this client side; client can assume that players not included in the update are not in the zone since with the cap, all players fit in a single update
 * cap updates at 60/sec
   * save timestamp when receiving the Connected message; calculate update number based on time since then
 * finish writing docs
@@ -36,4 +34,5 @@
   * pass the key to the client in the `Connected` message
   * without encrypting, messages would still be readable by outside actors but not forgeable
   * probably wait for ssl to add this
-* switch to UDP only?? the overhead on using ws is probably not worth it, but would require a more complicated protocol
+* switch to UDP only?? the overhead on using ws is probably not worth it, but would require a much more complicated protocol
+  * improve server message format so it doesn't send unnecessary data, like the transform for players in different zones

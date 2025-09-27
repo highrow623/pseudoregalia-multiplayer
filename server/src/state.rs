@@ -4,36 +4,34 @@ use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 // arbitrary limit on number of connected players, but this also happens to guarantee that server
 // updates fit in one packet
-const MAX_PLAYERS: usize = 32;
+const MAX_PLAYERS: usize = 26;
 
 // the header consists of an update number and the zone, both 4 bytes long
-pub const HEADER_LEN: usize = 8;
-pub const STATE_LEN: usize = 16;
+pub const HEADER_LEN: usize = 4;
+pub const STATE_LEN: usize = 20;
 pub const CLIENT_PACKET_LEN: usize = HEADER_LEN + STATE_LEN;
 
 pub struct PlayerState {
     update_num: u32,
-    zone: u32,
     bytes: [u8; STATE_LEN],
 }
 
 impl PlayerState {
     /// Creates a new PlayerState from its byte representation. Also returns the bytes of the header
-    /// and the parsed zone and id.
-    pub fn from_bytes(bytes: &[u8; CLIENT_PACKET_LEN]) -> ([u8; HEADER_LEN], u32, u8, Self) {
+    /// and the parsed id.
+    pub fn from_bytes(bytes: &[u8; CLIENT_PACKET_LEN]) -> ([u8; HEADER_LEN], u8, Self) {
         let header_bytes: [u8; HEADER_LEN] = bytes[..HEADER_LEN].try_into().unwrap();
-        let update_num = u32::from_be_bytes(header_bytes[..4].try_into().unwrap());
-        let zone = u32::from_be_bytes(header_bytes[4..].try_into().unwrap());
+        let update_num = u32::from_be_bytes(header_bytes[..].try_into().unwrap());
 
         // id is the byte right after the header
         let id = bytes[HEADER_LEN];
         let bytes = bytes[HEADER_LEN..].try_into().unwrap();
 
-        (header_bytes, zone, id, Self { update_num, zone, bytes })
+        (header_bytes, id, Self { update_num, bytes })
     }
 
     fn new() -> Self {
-        Self { update_num: 0u32, zone: 0u32, bytes: [0u8; STATE_LEN] }
+        Self { update_num: 0u32, bytes: [0u8; STATE_LEN] }
     }
 
     fn update(&mut self, other: Self) -> bool {
@@ -130,11 +128,11 @@ impl State {
     }
 
     /// Returns the current bytes for every player, skipping the player with id matching the `id`
-    /// param, players in different zones, and other players that haven't been updated yet.
-    pub fn filtered_state(&self, zone: u32, id: u8) -> Vec<[u8; STATE_LEN]> {
+    /// param and other players that haven't been updated yet.
+    pub fn filtered_state(&self, id: u8) -> Vec<[u8; STATE_LEN]> {
         let mut filtered_state = Vec::with_capacity(self.players.len());
         for (player_id, player) in &self.players {
-            if id == *player_id || zone != player.state.zone || !player.state.has_updated() {
+            if id == *player_id || !player.state.has_updated() {
                 continue;
             }
             filtered_state.push(player.state.bytes);
