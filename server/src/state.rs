@@ -2,31 +2,38 @@ use rand::{Rng, SeedableRng, rngs::SmallRng};
 use std::collections::HashMap;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
-pub const HEADER_LEN: usize = 4;
-const ID_LEN: usize = 4;
-pub const STATE_LEN: usize = 44;
+// arbitrary limit on number of connected players, but this also happens to guarantee that server
+// updates fit in one packet
+const MAX_PLAYERS: usize = 32;
+
+// the header consists of an update number and the zone, both 4 bytes long
+pub const HEADER_LEN: usize = 8;
+pub const STATE_LEN: usize = 16;
 pub const CLIENT_PACKET_LEN: usize = HEADER_LEN + STATE_LEN;
 
 pub struct PlayerState {
     update_num: u32,
+    zone: u32,
     bytes: [u8; STATE_LEN],
 }
 
 impl PlayerState {
-    /// Creates a new PlayerState from its byte representation. Also returns the bytes of the update
-    /// number and the parsed id.
-    pub fn from_bytes(bytes: &[u8; CLIENT_PACKET_LEN]) -> ([u8; HEADER_LEN], u32, Self) {
-        let update_num_bytes = bytes[..HEADER_LEN].try_into().unwrap();
-        let update_num = u32::from_be_bytes(update_num_bytes);
+    /// Creates a new PlayerState from its byte representation. Also returns the bytes of the header
+    /// and the parsed zone and id.
+    pub fn from_bytes(bytes: &[u8; CLIENT_PACKET_LEN]) -> ([u8; HEADER_LEN], u32, u8, Self) {
+        let header_bytes: [u8; HEADER_LEN] = bytes[..HEADER_LEN].try_into().unwrap();
+        let update_num = u32::from_be_bytes(header_bytes[..4].try_into().unwrap());
+        let zone = u32::from_be_bytes(header_bytes[4..].try_into().unwrap());
 
-        let id = u32::from_be_bytes(bytes[HEADER_LEN..HEADER_LEN + ID_LEN].try_into().unwrap());
+        // id is the byte right after the header
+        let id = bytes[HEADER_LEN];
         let bytes = bytes[HEADER_LEN..].try_into().unwrap();
 
-        (update_num_bytes, id, Self { update_num, bytes })
+        (header_bytes, zone, id, Self { update_num, zone, bytes })
     }
 
     fn new() -> Self {
-        Self { update_num: 0, bytes: [0u8; STATE_LEN] }
+        Self { update_num: 0u32, zone: 0u32, bytes: [0u8; STATE_LEN] }
     }
 
     fn update(&mut self, other: Self) -> bool {
@@ -44,8 +51,8 @@ impl PlayerState {
 }
 
 pub enum ConnectionUpdate {
-    Connected(u32),
-    Disconnected(u32),
+    Connected(u8),
+    Disconnected(u8),
 }
 
 struct Player {
@@ -62,7 +69,7 @@ impl Player {
 /// Shared state between all threads, used to track what has been received from and what should be
 /// sent to players.
 pub struct State {
-    players: HashMap<u32, Player>,
+    players: HashMap<u8, Player>,
     rng: SmallRng,
 }
 
@@ -71,12 +78,18 @@ impl State {
         Self { players: HashMap::new(), rng: SmallRng::from_rng(&mut rand::rng()) }
     }
 
-    pub fn connect(&mut self) -> Option<(u32, UnboundedReceiver<ConnectionUpdate>, Vec<u32>)> {
-        let id: u32 = self.rng.random();
-        if self.players.contains_key(&id) {
-            // id collision
+    pub fn connect(&mut self) -> Option<(u8, UnboundedReceiver<ConnectionUpdate>, Vec<u8>)> {
+        if self.players.len() == MAX_PLAYERS {
             return None;
         }
+
+        // player limit means this should be fine, right?
+        let id = loop {
+            let id = self.rng.random::<u8>();
+            if !self.players.contains_key(&id) {
+                break id;
+            }
+        };
 
         // create list of other players' ids while informing other players of this new connection
         let mut players = Vec::with_capacity(self.players.len());
@@ -95,7 +108,7 @@ impl State {
 
     /// Removes the player associated with id from state and informs other players that they
     /// disconnected.
-    pub fn disconnect(&mut self, id: u32) {
+    pub fn disconnect(&mut self, id: u8) {
         if let None = self.players.remove(&id) {
             // TODO this shouldn't happen, right?
             return;
@@ -106,9 +119,9 @@ impl State {
         }
     }
 
-    /// Updates player state if the id exists and the state number is greater than the current.
-    /// Returns true if state was updated.
-    pub fn update(&mut self, id: u32, player_state: PlayerState) -> bool {
+    /// Updates player state if the id corresponds to a connected player and the update number in
+    /// player_state is greater than the current number. Returns true if state was updated.
+    pub fn update(&mut self, id: u8, player_state: PlayerState) -> bool {
         // TODO should this be combined with filtered_state and return Option<Vec<[u8; STATE_LEN]>>?
         match self.players.get_mut(&id) {
             Some(player) => player.state.update(player_state),
@@ -117,11 +130,11 @@ impl State {
     }
 
     /// Returns the current bytes for every player, skipping the player with id matching the `id`
-    /// param and other players that haven't been updated yet.
-    pub fn filtered_state(&self, id: u32) -> Vec<[u8; STATE_LEN]> {
+    /// param, players in different zones, and other players that haven't been updated yet.
+    pub fn filtered_state(&self, zone: u32, id: u8) -> Vec<[u8; STATE_LEN]> {
         let mut filtered_state = Vec::with_capacity(self.players.len());
         for (player_id, player) in &self.players {
-            if id == *player_id || !player.state.has_updated() {
+            if id == *player_id || zone != player.state.zone || !player.state.has_updated() {
                 continue;
             }
             filtered_state.push(player.state.bytes);

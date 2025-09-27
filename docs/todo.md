@@ -2,12 +2,16 @@
 
 ## For initial release
 
-* try reconnecting to the server when an error happens instead of only on scene load
+* fix zone issue (will have to update protocol again)
+  * could also just keep this client side; client can assume that players not included in the update are not in the zone since with the cap, all players fit in a single update
+* cap updates at 60/sec
+  * save timestamp when receiving the Connected message; calculate update number based on time since then
 * finish writing docs
 * add license
 
 ## Other
 
+* try reconnecting to the server when an error happens instead of only on scene load
 * use JSON schema in cpp mod instead of parsing for errors manually?
   * I've got the schema at client/PseudoregaliaMultiplayerMod/server-message-schema.json if I end up wanting to use it
 * better logging/error handling
@@ -32,3 +36,4 @@
   * pass the key to the client in the `Connected` message
   * without encrypting, messages would still be readable by outside actors but not forgeable
   * probably wait for ssl to add this
+* switch to UDP only?? the overhead on using ws is probably not worth it, but would require a more complicated protocol

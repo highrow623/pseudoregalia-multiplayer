@@ -11,9 +11,9 @@ use tokio_tungstenite::WebSocketStream;
 #[derive(Serialize)]
 #[serde(tag = "type")]
 enum ServerMessage {
-    Connected { id: u32, players: Vec<u32> },
-    PlayerJoined { id: u32 },
-    PlayerLeft { id: u32 },
+    Connected { id: u8, players: Vec<u8> },
+    PlayerJoined { id: u8 },
+    PlayerLeft { id: u8 },
 }
 
 #[derive(Deserialize)]
@@ -25,7 +25,7 @@ enum ClientMessage {
 /// Cleans up connection by disconnecting id from state on drop
 struct DisconnectHandler {
     state: Arc<Mutex<State>>,
-    id: u32,
+    id: u8,
 }
 
 impl Drop for DisconnectHandler {

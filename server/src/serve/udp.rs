@@ -5,7 +5,7 @@ use std::{
 };
 use tokio::net::UdpSocket;
 
-const MAX_STATES_PER_PACKET: usize = 11;
+const MAX_STATES_PER_PACKET: usize = 31;
 const MAX_PACKET_LEN: usize = HEADER_LEN + MAX_STATES_PER_PACKET * STATE_LEN;
 const _: () = assert!(MAX_PACKET_LEN <= 508);
 const _: () = assert!(MAX_PACKET_LEN + STATE_LEN > 508);
@@ -13,7 +13,7 @@ const _: () = assert!(MAX_PACKET_LEN + STATE_LEN > 508);
 // TODO should send_to be put in a tokio::spawn()?
 pub async fn handle_packet(
     state: Arc<Mutex<State>>,
-    (update_num_bytes, id, player_state): ([u8; HEADER_LEN], u32, PlayerState),
+    (header_bytes, zone, id, player_state): ([u8; HEADER_LEN], u32, u8, PlayerState),
     udp_socket: Arc<UdpSocket>,
     addr: SocketAddr,
 ) {
@@ -23,8 +23,8 @@ pub async fn handle_packet(
 
     let mut buf = [0u8; MAX_PACKET_LEN];
     let mut states_in_buf = 0;
-    buf[..HEADER_LEN].copy_from_slice(&update_num_bytes[..]);
-    let filtered_state = state.lock().unwrap().filtered_state(id);
+    buf[..HEADER_LEN].copy_from_slice(&header_bytes[..]);
+    let filtered_state = state.lock().unwrap().filtered_state(zone, id);
     for bytes in filtered_state.iter() {
         // states_in_buf ranges from 0 to MAX_STATES_PER_PACKET - 1 here so copy target will always
         // be within buf

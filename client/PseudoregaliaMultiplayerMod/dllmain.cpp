@@ -70,7 +70,7 @@ public:
     static void sync_ghost_info(RC::Unreal::UnrealScriptFunctionCallableContext& context, void* customdata)
     {
         RC::Unreal::TArray<FST_PlayerInfo> ghost_info{};
-        RC::Unreal::TArray<int64_t> to_remove{};
+        RC::Unreal::TArray<uint8_t> to_remove{};
         Client::GetGhostInfo(ghost_info, to_remove);
 
         RC::Unreal::UFunction* update_ghosts = context.Context->GetFunctionByName(L"UpdateGhosts");
@@ -82,7 +82,7 @@ public:
         struct UpdateGhostsParams
         {
             RC::Unreal::TArray<FST_PlayerInfo> ghost_info;
-            RC::Unreal::TArray<int64_t> to_remove;
+            RC::Unreal::TArray<uint8_t> to_remove;
         };
         std::shared_ptr<void> params = std::make_shared<UpdateGhostsParams>(ghost_info, to_remove);
         context.Context->ProcessEvent(update_ghosts, params.get());

@@ -21,27 +21,42 @@
 
 namespace
 {
+    const size_t HEADER_LEN = 8;
+    const size_t STATE_LEN = 16;
+    const size_t MAX_STATES_PER_PACKET = 31;
+    const size_t MIN_SERVER_PACKET_LEN = HEADER_LEN + STATE_LEN;
+    const size_t MAX_SERVER_PACKET_LEN = HEADER_LEN + MAX_STATES_PER_PACKET * STATE_LEN;
+
+    const size_t SEND = MIN_SERVER_PACKET_LEN;
+    const size_t RECV = MAX_SERVER_PACKET_LEN;
+
     void OnOpen();
     void OnClose();
     void OnMessage(const std::string&);
     void OnError(const std::string&);
 
-    void OnRecv(const boost::array<uint8_t, 512>&, size_t);
+    void OnRecv(const boost::array<uint8_t, RECV>&, size_t);
     void OnErr(const std::string&);
 
     std::wstring ToWide(const std::string&);
     uint32_t HashW(const std::wstring&);
-    int64_t ToUnrealId(const uint32_t&);
 
-    void SerializeU32(uint32_t, boost::array<uint8_t, 48>&, size_t&);
-    void SerializeF32(float, boost::array<uint8_t, 48>&, size_t&);
-    uint32_t DeserializeU32(const boost::array<uint8_t, 512>&, size_t&);
-    float DeserializeF32(const boost::array<uint8_t, 512>&, size_t&);
+    void SerializeU8(uint8_t, boost::array<uint8_t, SEND>&, size_t&);
+    void SerializeU32(uint32_t, boost::array<uint8_t, SEND>&, size_t&);
+    void SerializeF32(float, boost::array<uint8_t, SEND>&, size_t&);
+    void SerializeLocator(double, boost::array<uint8_t, SEND>&, size_t&);
+    void SerializeRotator(double, boost::array<uint8_t, SEND>&, size_t&);
+
+    uint8_t DeserializeU8(const boost::array<uint8_t, RECV>&, size_t&);
+    uint32_t DeserializeU32(const boost::array<uint8_t, RECV>&, size_t&);
+    float DeserializeF32(const boost::array<uint8_t, RECV>&, size_t&);
+    double DeserializeLocator(const boost::array<uint8_t, RECV>&, size_t&);
+    double DeserializeRotator(const boost::array<uint8_t, RECV>&, size_t&);
 
     bool queue_connect = false;
     bool queue_disconnect = false;
     wswrap::WS* ws = nullptr;
-    UdpSocket::UdpSocket<48, 512>* udp = nullptr;
+    UdpSocket::UdpSocket<SEND, RECV>* udp = nullptr;
 
     struct Ghost
     {
@@ -55,10 +70,10 @@ namespace
     std::optional<FST_PlayerInfo> player_info = {};
 
     // the id given in the Connected message; this value being defined means a full connection has been established
-    std::optional<uint32_t> id = {};
+    std::optional<uint8_t> id = {};
     uint32_t update_num = 0;
-    std::unordered_map<uint32_t, Ghost> ghosts = {};
-    std::unordered_set<uint32_t> spawned_ghosts = {};
+    std::unordered_map<uint8_t, Ghost> ghosts = {};
+    std::unordered_set<uint8_t> spawned_ghosts = {};
 }
 
 void Client::OnSceneLoad(std::wstring level)
@@ -103,7 +118,7 @@ void Client::Tick()
                 const auto& port = Settings::GetPort();
                 auto uri = "ws://" + address + ":" + std::to_string(port);
                 ws = new wswrap::WS(uri, OnOpen, OnClose, OnMessage, OnError);
-                udp = new UdpSocket::UdpSocket<48, 512>(address, port, OnRecv, OnErr);
+                udp = new UdpSocket::UdpSocket<SEND, RECV>(address, port, OnRecv, OnErr);
             }
             catch (const std::exception& ex)
             {
@@ -116,21 +131,18 @@ void Client::Tick()
     }
     if (id && player_info)
     {
-        boost::array<uint8_t, 48> buf{};
+        boost::array<uint8_t, SEND> buf{};
         update_num++;
         size_t pos = 0;
         SerializeU32(update_num, buf, pos);
-        SerializeU32(*id, buf, pos);
         SerializeU32(current_zone, buf, pos);
-        SerializeF32(float(player_info->location_x), buf, pos);
-        SerializeF32(float(player_info->location_y), buf, pos);
-        SerializeF32(float(player_info->location_z), buf, pos);
-        SerializeF32(float(player_info->rotation_x), buf, pos);
-        SerializeF32(float(player_info->rotation_y), buf, pos);
-        SerializeF32(float(player_info->rotation_z), buf, pos);
-        SerializeF32(float(player_info->scale_x), buf, pos);
-        SerializeF32(float(player_info->scale_y), buf, pos);
-        SerializeF32(float(player_info->scale_z), buf, pos);
+        SerializeU8(*id, buf, pos);
+        SerializeLocator(player_info->location_x, buf, pos);
+        SerializeLocator(player_info->location_y, buf, pos);
+        SerializeLocator(player_info->location_z, buf, pos);
+        SerializeRotator(player_info->rotation_x, buf, pos);
+        SerializeRotator(player_info->rotation_y, buf, pos);
+        SerializeRotator(player_info->rotation_z, buf, pos);
         udp->Send(buf);
     }
     if (ws)
@@ -145,25 +157,30 @@ void Client::SetPlayerInfo(const FST_PlayerInfo& info)
     player_info = info;
 }
 
-void Client::GetGhostInfo(RC::Unreal::TArray<FST_PlayerInfo>& ghost_info, RC::Unreal::TArray<int64_t>& to_remove)
+void Client::GetGhostInfo(RC::Unreal::TArray<FST_PlayerInfo>& ghost_info, RC::Unreal::TArray<uint8_t>& to_remove)
 {
     for (auto& [id, ghost] : ghosts)
     {
-        if (!ghost.updated || ghost.zone != current_zone)
+        if (!ghost.updated)
+        {
+            continue;
+        }
+
+        ghost.updated = false;
+        if (ghost.zone != current_zone)
         {
             continue;
         }
 
         ghost_info.Add(ghost.info);
         spawned_ghosts.insert(id);
-        ghost.updated = false;
     }
 
     for (auto it = spawned_ghosts.begin(); it != spawned_ghosts.end(); )
     {
         if (!ghosts.contains(*it) || ghosts.at(*it).zone != current_zone)
         {
-            to_remove.Add(ToUnrealId(*it));
+            to_remove.Add(*it);
             it = spawned_ghosts.erase(it);
         }
         else
@@ -193,6 +210,9 @@ void OnClose()
 
 void OnMessage(const std::string& message)
 {
+    // set this here in case we return early
+    queue_disconnect = true;
+
     nlohmann::json j = nlohmann::json::parse(message);
     if (!j.is_object())
     {
@@ -206,20 +226,18 @@ void OnMessage(const std::string& message)
         return;
     }
 
-    if (!j["type"].is_string())
+    auto& field_type = j["type"];
+    if (!field_type.is_string())
     {
         Log(L"Received message with non-string type field: " + ToWide(message), LogType::Warning);
         return;
     }
 
-    if (j["type"] == "Connected")
+    if (field_type == "Connected")
     {
-        // set this here in case we return early
-        queue_disconnect = true;
-
         if (id)
         {
-            Log(L"Received Connected message after connection was already established");
+            Log(L"Received Connected message after connection was already established", LogType::Warning);
             return;
         }
 
@@ -229,11 +247,20 @@ void OnMessage(const std::string& message)
             return;
         }
 
-        if (!j["id"].is_number_unsigned())
+        auto& field_id = j["id"];
+        if (!field_id.is_number_unsigned())
         {
             Log(L"Received Connected message with invalid id field: " + ToWide(message), LogType::Warning);
             return;
         }
+
+        auto long_id = field_id.template get<uint64_t>();
+        if (long_id > 0xFF)
+        {
+            Log(L"Received Connected message with out-of-range id field: " + ToWide(message), LogType::Warning);
+            return;
+        }
+        id = uint8_t(long_id);
 
         if (!j.contains("players"))
         {
@@ -241,13 +268,14 @@ void OnMessage(const std::string& message)
             return;
         }
 
-        if (!j["players"].is_array())
+        auto& field_players = j["players"];
+        if (!field_players.is_array())
         {
             Log(L"Received Connected message with non-array players field: " + ToWide(message), LogType::Warning);
             return;
         }
 
-        for (auto it = j["players"].begin(); it != j["players"].end(); ++it)
+        for (auto it = field_players.begin(); it != field_players.end(); ++it)
         {
             if (!it->is_number_unsigned())
             {
@@ -255,54 +283,90 @@ void OnMessage(const std::string& message)
                 return;
             }
 
-            auto player_id = it->template get<uint32_t>();
-            ghosts[player_id] = Ghost{ .info = FST_PlayerInfo{ .id = ToUnrealId(player_id) } };
+            auto long_player_id = it->template get<uint64_t>();
+            if (long_player_id > 0xFF)
+            {
+                Log(L"Received Connected message with out-of-range player id: " + ToWide(message), LogType::Warning);
+                return;
+            }
+
+            auto player_id = uint8_t(long_player_id);
+            ghosts[player_id] = Ghost{ .info = FST_PlayerInfo{ .id = player_id } };
         }
  
-        id = j["id"].template get<uint32_t>();
-        queue_disconnect = false;
         Log(L"Received Connected message with player id " + std::to_wstring(*id), LogType::Loud);
     }
-    else if (j["type"] == "PlayerJoined")
+    else if (field_type == "PlayerJoined")
     {
+        if (!id)
+        {
+            Log(L"Received PlayerJoined message before Connected message", LogType::Warning);
+            return;
+        }
+
         if (!j.contains("id"))
         {
             Log(L"Received PlayerJoined message with no id field: " + ToWide(message), LogType::Warning);
             return;
         }
 
-        if (!j["id"].is_number_unsigned())
+        auto& field_id = j["id"];
+        if (!field_id.is_number_unsigned())
         {
             Log(L"Received PlayerJoined message with invalid id field: " + ToWide(message), LogType::Warning);
             return;
         }
 
-        auto player_id = j["id"].template get<uint32_t>();
-        ghosts[player_id] = Ghost{ .info = FST_PlayerInfo{ .id = ToUnrealId(player_id) } };
+        auto long_player_id = field_id.template get<uint64_t>();
+        if (long_player_id > 0xFF)
+        {
+            Log(L"Received PlayerJoined message with out-of-range id field: " + ToWide(message), LogType::Warning);
+            return;
+        }
+
+        auto player_id = uint8_t(long_player_id);
+        ghosts[player_id] = Ghost{ .info = FST_PlayerInfo{ .id = player_id } };
         Log(L"Received PlayerJoined message with id " + std::to_wstring(player_id), LogType::Loud);
     }
-    else if (j["type"] == "PlayerLeft")
+    else if (field_type == "PlayerLeft")
     {
+        if (!id)
+        {
+            Log(L"Received PlayerLeft message before Connected message", LogType::Warning);
+            return;
+        }
+
         if (!j.contains("id"))
         {
             Log(L"Received PlayerLeft message with no id field: " + ToWide(message), LogType::Warning);
             return;
         }
 
-        if (!j["id"].is_number_unsigned())
+        auto& field_id = j["id"];
+        if (!field_id.is_number_unsigned())
         {
             Log(L"Received PlayerLeft message with invalid id field: " + ToWide(message), LogType::Warning);
             return;
         }
 
-        auto player_id = j["id"].template get<uint32_t>();
+        auto long_player_id = field_id.template get<uint64_t>();
+        if (long_player_id > 0xFF)
+        {
+            Log(L"Received PlayerLeft message with out-of-range id field: " + ToWide(message), LogType::Warning);
+            return;
+        }
+
+        auto player_id = uint8_t(long_player_id);
         ghosts.erase(player_id);
         Log(L"Received PlayerLeft message with id " + std::to_wstring(player_id), LogType::Loud);
     }
     else
     {
-        Log(L"Received message with unknown type: " + ToWide(j["type"]), LogType::Warning);
+        Log(L"Received message with unknown type: " + ToWide(field_type), LogType::Warning);
+        return;
     }
+
+    queue_disconnect = false;
 }
 
 void OnError(const std::string& error_message)
@@ -310,9 +374,9 @@ void OnError(const std::string& error_message)
     Log(L"WebSocket error: " + ToWide(error_message), LogType::Error);
 }
 
-void OnRecv(const boost::array<uint8_t, 512>& buf, size_t len)
+void OnRecv(const boost::array<uint8_t, RECV>& buf, size_t len)
 {
-    if (len < 48 || len > 488 || len % 44 != 4)
+    if (len < MIN_SERVER_PACKET_LEN || len > MAX_SERVER_PACKET_LEN || len % STATE_LEN != HEADER_LEN)
     {
         Log(L"Received packet of invalid size " + std::to_wstring(len), LogType::Warning);
         return;
@@ -320,32 +384,31 @@ void OnRecv(const boost::array<uint8_t, 512>& buf, size_t len)
 
     size_t pos = 0;
     uint32_t update_num = DeserializeU32(buf, pos);
-    size_t num_updates = (len - 4) / 44;
+    uint32_t zone = DeserializeU32(buf, pos);
+    if (zone != current_zone)
+    {
+        return;
+    }
+
+    size_t num_updates = (len - HEADER_LEN) / STATE_LEN;
     for (size_t i = 0; i < num_updates; i++)
     {
-        pos = 4 + i * 44;
-        uint32_t player_id = DeserializeU32(buf, pos);
-        if (!ghosts.contains(player_id))
+        uint8_t player_id = DeserializeU8(buf, pos);
+        if (!ghosts.contains(player_id) || ghosts.at(player_id).update_num >= update_num)
         {
+            // skip pos ahead the bytes it would have read for this player
+            pos += 15;
             continue;
         }
 
         auto& ghost = ghosts.at(player_id);
-        if (update_num <= ghost.update_num)
-        {
-            continue;
-        }
-
-        ghost.zone = DeserializeU32(buf, pos);
-        ghost.info.location_x = double(DeserializeF32(buf, pos));
-        ghost.info.location_y = double(DeserializeF32(buf, pos));
-        ghost.info.location_z = double(DeserializeF32(buf, pos));
-        ghost.info.rotation_x = double(DeserializeF32(buf, pos));
-        ghost.info.rotation_y = double(DeserializeF32(buf, pos));
-        ghost.info.rotation_z = double(DeserializeF32(buf, pos));
-        ghost.info.scale_x = double(DeserializeF32(buf, pos));
-        ghost.info.scale_y = double(DeserializeF32(buf, pos));
-        ghost.info.scale_z = double(DeserializeF32(buf, pos));
+        ghost.zone = zone;
+        ghost.info.location_x = DeserializeLocator(buf, pos);
+        ghost.info.location_y = DeserializeLocator(buf, pos);
+        ghost.info.location_z = DeserializeLocator(buf, pos);
+        ghost.info.rotation_x = DeserializeRotator(buf, pos);
+        ghost.info.rotation_y = DeserializeRotator(buf, pos);
+        ghost.info.rotation_z = DeserializeRotator(buf, pos);
         ghost.update_num = update_num;
         ghost.updated = true;
     }
@@ -382,14 +445,15 @@ uint32_t HashW(const std::wstring& str)
     return result;
 }
 
-// converts a uint32_t into an int64_t with the same value
-int64_t ToUnrealId(const uint32_t& id)
+// Serializes src into 1 byte of buf starting at pos and increments pos by 1.
+void SerializeU8(uint8_t src, boost::array<uint8_t, SEND>& buf, size_t& pos)
 {
-    return std::bit_cast<int64_t>(uint64_t(id));
+    buf[pos] = src;
+    pos += 1;
 }
 
 // Serializes src into 4 bytes of buf starting at pos and increments pos by 4.
-void SerializeU32(uint32_t src, boost::array<uint8_t, 48>& buf, size_t& pos)
+void SerializeU32(uint32_t src, boost::array<uint8_t, SEND>& buf, size_t& pos)
 {
     buf[pos + 3] = uint8_t(src);
     for (int i = 2; i >= 0; i--)
@@ -401,14 +465,36 @@ void SerializeU32(uint32_t src, boost::array<uint8_t, 48>& buf, size_t& pos)
 }
 
 // Serializes src into 4 bytes of buf starting at pos and increments pos by 4.
-void SerializeF32(float src, boost::array<uint8_t, 48>& buf, size_t& pos)
+void SerializeF32(float src, boost::array<uint8_t, SEND>& buf, size_t& pos)
 {
     uint32_t src_bits = std::bit_cast<uint32_t>(src);
     SerializeU32(src_bits, buf, pos);
 }
 
-// Derializes 4 bytes of buf into a uint32_t starting at pos and increments pos by 4.
-uint32_t DeserializeU32(const boost::array<uint8_t, 512>& buf, size_t& pos)
+// Casts src to a float, then serializes that into 4 bytes of buf starting at pos and increments pos by 4.
+void SerializeLocator(double src, boost::array<uint8_t, SEND>& buf, size_t& pos)
+{
+    SerializeF32(float(src), buf, pos);
+}
+
+// Maps src from the range [-180.0, 180.0] to [0, 255], serializes that into 1 byte of buf starting at pos, and
+// increments pos by 1.
+void SerializeRotator(double src, boost::array<uint8_t, SEND>& buf, size_t& pos)
+{
+    double scaled = (src + 180.0) * 256.0 / 360.0;
+    SerializeU8(uint8_t(scaled), buf, pos);
+}
+
+// Deserializes 1 byte of buf into a uint8_t starting at pos and increments pos by 1.
+uint8_t DeserializeU8(const boost::array<uint8_t, RECV>& buf, size_t& pos)
+{
+    uint8_t result = buf[pos];
+    pos += 1;
+    return result;
+}
+
+// Deserializes 4 bytes of buf into a uint32_t starting at pos and increments pos by 4.
+uint32_t DeserializeU32(const boost::array<uint8_t, RECV>& buf, size_t& pos)
 {
     uint32_t result = buf[pos];
     for (int i = 1; i < 4; i++)
@@ -420,11 +506,24 @@ uint32_t DeserializeU32(const boost::array<uint8_t, 512>& buf, size_t& pos)
     return result;
 }
 
-// Derializes 4 bytes of buf into a float starting at pos and increments pos by 4.
-float DeserializeF32(const boost::array<uint8_t, 512>& buf, size_t& pos)
+// Deserializes 4 bytes of buf into a float starting at pos and increments pos by 4.
+float DeserializeF32(const boost::array<uint8_t, RECV>& buf, size_t& pos)
 {
     uint32_t bits = DeserializeU32(buf, pos);
     return std::bit_cast<float>(bits);
+}
+
+// Deserializes 4 bytes of buf into a float starting at posts and increments pos by 4, then casts the float to a double.
+double DeserializeLocator(const boost::array<uint8_t, RECV>& buf, size_t& pos)
+{
+    return double(DeserializeF32(buf, pos));
+}
+
+// Deserializes 1 byte of buf starting at pos and increments pos by 1, then maps that byte to the range [-180.0, 180.0].
+double DeserializeRotator(const boost::array<uint8_t, RECV>& buf, size_t& pos)
+{
+    uint8_t byte = DeserializeU8(buf, pos);
+    return double(byte) * 360.0 / 256.0 - 180.0;
 }
 
 } // namespace
