@@ -8,7 +8,7 @@
 ## Other
 
 * I think the error handling on creating the ws/udp socket might cause leaks
-* change default port off 8080? 23432 is unassigned and simple
+  * can I use smart pointers?
 * try reconnecting to the server when an error happens instead of only on scene load
 * use JSON schema in cpp mod instead of parsing for errors manually?
   * I've got the schema at client/PseudoregaliaMultiplayerMod/server-message-schema.json if I end up wanting to use it
@@ -36,3 +36,13 @@
   * probably wait for ssl to add this
 * switch to UDP only?? the overhead on using ws is probably not worth it, but would require a much more complicated protocol
   * improve server message format so it doesn't send unnecessary data, like the transform for players in different zones
+* idea for animation smoothing
+  * server keeps track of the last N updates received from each player by update number (N = 20?)
+  * in other words, it keeps updates in a sorted list, and whenever a new update comes in, it drops an update off the bottom if the total exceeds N
+    * the server can check first if an update would go on the bottom and just not insert it in that case, assuming the number of updates has reached N
+  * when responding to updates, for each other player, the server will send the latest update not already sent
+    * the idea is that the server still sends the same amount of information, but if it would repeat an update, it instead sends an older one
+  * the client also keeps track of the last few updates received for each player (M = N?)
+  * for each player, it calculates the average difference between their own update number and the latest update number received for the player
+  * then they use that to decide how far back into the list to display each frame (maybe a buffer equal to M? otherwise why keep that many)
+  * when it goes to play a certain update, if that update number exists, it just plays it. if not, it can interpolate between the two closest values
