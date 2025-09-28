@@ -74,6 +74,12 @@ namespace
     uint32_t update_num = 0;
     std::unordered_map<uint8_t, Ghost> ghosts = {};
     std::unordered_set<uint8_t> spawned_ghosts = {};
+
+    // about 1/60 seconds, in nanoseconds because that's what steady_clock uses
+    const int64_t NANOS_PER_UPDATE = 16666667;
+    std::optional<std::chrono::steady_clock::time_point> time_stamp = {};
+    // keeps track of nanoseconds accrued for updates, an update is fired when it exceeds NANOS_PER_UPDATE
+    int64_t nanos = 0;
 }
 
 void Client::OnSceneLoad(std::wstring level)
@@ -101,10 +107,14 @@ void Client::Tick()
             ws = nullptr;
             delete udp;
             udp = nullptr;
+
             id.reset();
             update_num = 0;
             ghosts.clear();
             // don't clear spawned_ghosts because we need to tell the bp mod to delete the actors
+
+            time_stamp.reset();
+            nanos = 0;
         }
         queue_disconnect = false;
     }
@@ -131,19 +141,32 @@ void Client::Tick()
     }
     if (id && player_info)
     {
-        boost::array<uint8_t, SEND> buf{};
-        update_num++;
-        size_t pos = 0;
-        SerializeU32(update_num, buf, pos);
-        SerializeU8(*id, buf, pos);
-        SerializeU32(current_zone, buf, pos);
-        SerializeLocator(player_info->location_x, buf, pos);
-        SerializeLocator(player_info->location_y, buf, pos);
-        SerializeLocator(player_info->location_z, buf, pos);
-        SerializeRotator(player_info->rotation_x, buf, pos);
-        SerializeRotator(player_info->rotation_y, buf, pos);
-        SerializeRotator(player_info->rotation_z, buf, pos);
-        udp->Send(buf);
+        auto now = std::chrono::steady_clock::now();
+        // time_stamp gets a value at the same time as id, so this should always be safe
+        nanos += (now - *time_stamp).count();
+        time_stamp = now;
+
+        auto updates_since_last = nanos / NANOS_PER_UPDATE;
+        if (updates_since_last > 0)
+        {
+            nanos = nanos % NANOS_PER_UPDATE;
+
+            update_num += uint32_t(updates_since_last);
+            boost::array<uint8_t, SEND> buf{};
+            size_t pos = 0;
+
+            SerializeU32(update_num, buf, pos);
+            SerializeU8(*id, buf, pos);
+            SerializeU32(current_zone, buf, pos);
+            SerializeLocator(player_info->location_x, buf, pos);
+            SerializeLocator(player_info->location_y, buf, pos);
+            SerializeLocator(player_info->location_z, buf, pos);
+            SerializeRotator(player_info->rotation_x, buf, pos);
+            SerializeRotator(player_info->rotation_y, buf, pos);
+            SerializeRotator(player_info->rotation_z, buf, pos);
+
+            udp->Send(buf);
+        }
     }
     if (ws)
     {
@@ -289,6 +312,7 @@ void OnMessage(const std::string& message)
             ghosts[player_id] = Ghost{ .info = FST_PlayerInfo{ .id = player_id } };
         }
  
+        time_stamp = std::chrono::steady_clock::now();
         Log(L"Received Connected message with player id " + std::to_wstring(*id), LogType::Loud);
     }
     else if (field_type == "PlayerJoined")

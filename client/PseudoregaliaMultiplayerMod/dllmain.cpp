@@ -69,9 +69,17 @@ public:
 
     static void sync_ghost_info(RC::Unreal::UnrealScriptFunctionCallableContext& context, void* customdata)
     {
-        RC::Unreal::TArray<FST_PlayerInfo> ghost_info{};
-        RC::Unreal::TArray<uint8_t> to_remove{};
-        Client::GetGhostInfo(ghost_info, to_remove);
+        struct UpdateGhostsParams
+        {
+            RC::Unreal::TArray<FST_PlayerInfo> ghost_info;
+            RC::Unreal::TArray<uint8_t> to_remove;
+        };
+        auto params = std::make_unique<UpdateGhostsParams>();
+        Client::GetGhostInfo(params->ghost_info, params->to_remove);
+        if (params->ghost_info.Num() == 0 && params->to_remove.Num() == 0)
+        {
+            return;
+        }
 
         RC::Unreal::UFunction* update_ghosts = context.Context->GetFunctionByName(L"UpdateGhosts");
         if (!update_ghosts)
@@ -79,12 +87,6 @@ public:
             Log(L"Could not find function \"UpdateGhosts\" in \"BP_PM_Manager_C\"", LogType::Error);
             return;
         }
-        struct UpdateGhostsParams
-        {
-            RC::Unreal::TArray<FST_PlayerInfo> ghost_info;
-            RC::Unreal::TArray<uint8_t> to_remove;
-        };
-        std::shared_ptr<void> params = std::make_shared<UpdateGhostsParams>(ghost_info, to_remove);
         context.Context->ProcessEvent(update_ghosts, params.get());
     }
 };

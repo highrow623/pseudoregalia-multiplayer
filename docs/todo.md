@@ -2,13 +2,13 @@
 
 ## For initial release
 
-* cap updates at 60/sec
-  * save timestamp when receiving the Connected message; calculate update number based on time since then
 * finish writing docs
 * add license
 
 ## Other
 
+* I think the error handling on creating the ws/udp socket might cause leaks
+* change default port off 8080? 23432 is unassigned and simple
 * try reconnecting to the server when an error happens instead of only on scene load
 * use JSON schema in cpp mod instead of parsing for errors manually?
   * I've got the schema at client/PseudoregaliaMultiplayerMod/server-message-schema.json if I end up wanting to use it
