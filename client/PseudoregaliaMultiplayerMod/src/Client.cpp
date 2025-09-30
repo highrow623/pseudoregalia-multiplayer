@@ -157,11 +157,36 @@ namespace
 
             auto ge = [&](const State& state) { return state.update_num >= update_num; };
             auto it = std::find_if(states.cbegin(), states.cend(), ge);
-            const State& higher = *it;
+            const State& upper = *it;
             --it;
             const State& lower = *it;
-            // TODO interpolate higher and lower based on distance to update_num
-            return (update_num - lower.update_num < higher.update_num - update_num) ? lower : higher;
+
+            uint32_t lower_dist = update_num - lower.update_num;
+            uint32_t upper_dist = upper.update_num - update_num;
+            bool lower_is_closer = lower_dist < upper_dist;
+            if (lower.zone != upper.zone)
+            {
+                // if the two closest states differ by zone, just return the closer one
+                return lower_is_closer ? lower : upper;
+            }
+
+            // distance from lower as a percentage
+            double pct = double(lower_dist) / double(lower_dist + upper_dist);
+            return State{
+                .info = FST_PlayerInfo{
+                    // interpolate location between lower and upper based on percent
+                    .location_x = lower.info.location_x + (upper.info.location_x - lower.info.location_x) * pct,
+                    .location_y = lower.info.location_y + (upper.info.location_y - lower.info.location_y) * pct,
+                    .location_z = lower.info.location_z + (upper.info.location_z - lower.info.location_z) * pct,
+                    // don't sweat interpolating rotation, just take the closer one
+                    .rotation_x = lower_is_closer ? lower.info.rotation_x : upper.info.rotation_x,
+                    .rotation_y = lower_is_closer ? lower.info.rotation_y : upper.info.rotation_y,
+                    .rotation_z = lower_is_closer ? lower.info.rotation_z : upper.info.rotation_z,
+                    .id = id,
+                },
+                .zone = lower.zone,
+                .update_num = update_num,
+            };
         }
     };
 
