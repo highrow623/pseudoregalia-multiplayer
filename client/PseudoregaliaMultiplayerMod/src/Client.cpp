@@ -21,11 +21,10 @@
 
 namespace
 {
-    const size_t HEADER_LEN = 4;
-    const size_t STATE_LEN = 20;
-    const size_t MAX_STATES_PER_PACKET = 25;
-    const size_t MIN_SERVER_PACKET_LEN = HEADER_LEN + STATE_LEN;
-    const size_t MAX_SERVER_PACKET_LEN = HEADER_LEN + MAX_STATES_PER_PACKET * STATE_LEN;
+    const size_t STATE_LEN = 24;
+    const size_t MAX_STATES_PER_PACKET = 21;
+    const size_t MIN_SERVER_PACKET_LEN = STATE_LEN;
+    const size_t MAX_SERVER_PACKET_LEN = MAX_STATES_PER_PACKET * STATE_LEN;
 
     const size_t SEND = MIN_SERVER_PACKET_LEN;
     const size_t RECV = MAX_SERVER_PACKET_LEN;
@@ -40,6 +39,9 @@ namespace
 
     std::wstring ToWide(const std::string&);
     uint32_t HashW(const std::wstring&);
+    std::chrono::steady_clock::time_point AdvanceNanos();
+    bool TrySendUpdate(const FST_PlayerInfo&);
+    void SendUpdate(const FST_PlayerInfo&);
 
     void SerializeU8(uint8_t, boost::array<uint8_t, SEND>&, size_t&);
     void SerializeU32(uint32_t, boost::array<uint8_t, SEND>&, size_t&);
@@ -58,12 +60,109 @@ namespace
     wswrap::WS* ws = nullptr;
     UdpSocket::UdpSocket<SEND, RECV>* udp = nullptr;
 
-    struct Ghost
+    const size_t MAX_STATES = 20;
+    const size_t MAX_OFFSETS = 100;
+
+    // some value in milliseconds to buffer when calculating update number to use for ghosts; causes delay, which can
+    // allow more time for packets to arrive
+    // TODO make this configurable, or auto calculate per ghost?
+    const int64_t UPDATE_NUM_BUFFER = 100;
+
+    struct State
     {
         FST_PlayerInfo info;
         uint32_t zone;
         uint32_t update_num;
-        bool updated;
+    };
+
+    struct Ghost
+    {
+        uint8_t id = 0;
+        std::list<State> states;
+
+        // offsets provide a way to figure out syncing. the offset is meant to describe how far off a player's update
+        // number is from our own. these two fields let us easily check the average offset over the last MAX_OFFSETS
+        // messages received
+        int64_t total_offset = 0;
+        std::deque<uint64_t> offsets;
+
+        State cached_state{};
+
+        bool can_insert(uint32_t update_num) const
+        {
+            auto eq = [&](const State& state) { return state.update_num == update_num; };
+            return std::find_if(states.begin(), states.end(), eq) == states.end()
+                && (states.size() < MAX_STATES || states.front().update_num < update_num);
+        }
+
+        // should only be called if can_insert returns true; otherwise states can include duplicates or this function
+        // can be unnecessarily called with a state that would be dropped anyway
+        void insert(State& s, const uint32_t& update_num)
+        {
+            // this is a new latest state, so update offset calculation
+            if (states.size() == 0 || s.update_num > states.back().update_num)
+            {
+                int64_t offset = int64_t(s.update_num) - int64_t(update_num);
+                total_offset += offset;
+                offsets.push_back(offset);
+                if (offsets.size() > MAX_OFFSETS)
+                {
+                    total_offset -= offsets.front();
+                    offsets.pop_front();
+                }
+            }
+
+            s.info.id = id;
+
+            // insert after the first element that has a lower update_num to keep the list sorted
+            // reverse find because we're more likely to be inserting towards the back of the list
+            auto less = [&](const State& state) { return state.update_num < s.update_num; };
+            auto it = std::find_if(states.rbegin(), states.rend(), less);
+            states.insert(it.base(), s);
+
+            if (states.size() > MAX_STATES)
+            {
+                states.pop_front();
+            }
+        }
+
+        const State& get_state() const
+        {
+            return cached_state;
+        }
+
+        std::optional<State> refresh_state(const uint32_t& update_num)
+        {
+            if (states.size() == 0 || offsets.size() == 0)
+            {
+                return {};
+            }
+
+            int64_t average_offset = total_offset / int64_t(offsets.size());
+            uint32_t ghost_update_num = uint32_t(int64_t(update_num) + average_offset - UPDATE_NUM_BUFFER);
+            cached_state = get_closest(ghost_update_num);
+            return cached_state;
+        }
+
+        State get_closest(const uint32_t& update_num) const
+        {
+            if (update_num <= states.front().update_num)
+            {
+                return states.front();
+            }
+            if (update_num >= states.back().update_num)
+            {
+                return states.back();
+            }
+
+            auto ge = [&](const State& state) { return state.update_num >= update_num; };
+            auto it = std::find_if(states.cbegin(), states.cend(), ge);
+            const State& higher = *it;
+            --it;
+            const State& lower = *it;
+            // TODO interpolate higher and lower based on distance to update_num
+            return (update_num - lower.update_num < higher.update_num - update_num) ? lower : higher;
+        }
     };
 
     uint32_t current_zone;
@@ -77,8 +176,11 @@ namespace
 
     // about 1/60 seconds, in nanoseconds because that's what steady_clock uses
     const int64_t NANOS_PER_UPDATE = 16666667;
+    // marks the time the first update was sent after connecting
+    std::optional<std::chrono::steady_clock::time_point> start = {};
+    // marks the last time the client checked if it could send an update; used to increment nanos
     std::optional<std::chrono::steady_clock::time_point> time_stamp = {};
-    // keeps track of nanoseconds accrued for updates, an update is fired when it exceeds NANOS_PER_UPDATE
+    // keeps track of nanoseconds accrued for updates, an update can only be only fired if it exceeds NANOS_PER_UPDATE
     int64_t nanos = 0;
 }
 
@@ -114,6 +216,7 @@ void Client::Tick()
             // don't clear spawned_ghosts because we need to tell the bp mod to delete the actors
 
             time_stamp.reset();
+            start.reset();
             nanos = 0;
         }
         queue_disconnect = false;
@@ -122,50 +225,42 @@ void Client::Tick()
     {
         if (!ws)
         {
+            const auto& address = Settings::GetAddress();
+            const auto& port = Settings::GetPort();
+            auto uri = "ws://" + address + ":" + std::to_string(port);
             try
             {
-                const auto& address = Settings::GetAddress();
-                const auto& port = Settings::GetPort();
-                auto uri = "ws://" + address + ":" + std::to_string(port);
                 ws = new wswrap::WS(uri, OnOpen, OnClose, OnMessage, OnError);
-                udp = new UdpSocket::UdpSocket<SEND, RECV>(address, port, OnRecv, OnErr);
             }
             catch (const std::exception& ex)
             {
                 ws = nullptr;
+                Log(L"Error creating WebSocket: " + ToWide(ex.what()), LogType::Error);
+            }
+            try
+            {
+                udp = new UdpSocket::UdpSocket<SEND, RECV>(address, port, OnRecv, OnErr);
+            }
+            catch (const std::exception& ex)
+            {
+                delete ws;
+                ws = nullptr;
                 udp = nullptr;
-                Log(L"Error connecting: " + ToWide(ex.what()), LogType::Error);
+                Log(L"Error creating UDP socket: " + ToWide(ex.what()), LogType::Error);
             }
         }
         queue_connect = false;
     }
-    if (id && player_info)
+    if (id && time_stamp)
     {
-        auto now = std::chrono::steady_clock::now();
-        // time_stamp gets a value at the same time as id, so this should always be safe
-        nanos += (now - *time_stamp).count();
-        time_stamp = now;
-
-        auto updates_since_last = nanos / NANOS_PER_UPDATE;
-        if (updates_since_last > 0)
+        AdvanceNanos();
+        if (player_info)
         {
-            nanos = nanos % NANOS_PER_UPDATE;
-
-            update_num += uint32_t(updates_since_last);
-            boost::array<uint8_t, SEND> buf{};
-            size_t pos = 0;
-
-            SerializeU32(update_num, buf, pos);
-            SerializeU8(*id, buf, pos);
-            SerializeU32(current_zone, buf, pos);
-            SerializeLocator(player_info->location_x, buf, pos);
-            SerializeLocator(player_info->location_y, buf, pos);
-            SerializeLocator(player_info->location_z, buf, pos);
-            SerializeRotator(player_info->rotation_x, buf, pos);
-            SerializeRotator(player_info->rotation_y, buf, pos);
-            SerializeRotator(player_info->rotation_z, buf, pos);
-
-            udp->Send(buf);
+            bool sent = TrySendUpdate(*player_info);
+            if (sent)
+            {
+                player_info.reset();
+            }
         }
     }
     if (ws)
@@ -177,26 +272,47 @@ void Client::Tick()
 
 void Client::SetPlayerInfo(const FST_PlayerInfo& info)
 {
-    player_info = info;
+    if (!id)
+    {
+        return;
+    }
+    if (!start)
+    {
+        start = std::chrono::steady_clock::now();
+        time_stamp = start;
+        SendUpdate(info);
+    }
+    else
+    {
+        auto now = AdvanceNanos();
+        // convert nanos since start to millis since start
+        update_num = uint32_t((now - *start).count() / 1000000);
+
+        bool sent = TrySendUpdate(info);
+        if (!sent)
+        {
+            player_info = info;
+        }
+    }
 }
 
 void Client::GetGhostInfo(RC::Unreal::TArray<FST_PlayerInfo>& ghost_info, RC::Unreal::TArray<uint8_t>& to_remove)
 {
     for (auto& [id, ghost] : ghosts)
     {
-        if (!ghost.updated || ghost.zone != current_zone)
+        const auto& state = ghost.refresh_state(update_num);
+        if (!state || state->zone != current_zone)
         {
             continue;
         }
 
-        ghost.updated = false;
-        ghost_info.Add(ghost.info);
+        ghost_info.Add(state->info);
         spawned_ghosts.insert(id);
     }
 
     for (auto it = spawned_ghosts.begin(); it != spawned_ghosts.end(); )
     {
-        if (!ghosts.contains(*it) || ghosts.at(*it).zone != current_zone)
+        if (!ghosts.contains(*it) || ghosts.at(*it).get_state().zone != current_zone)
         {
             to_remove.Add(*it);
             it = spawned_ghosts.erase(it);
@@ -309,10 +425,9 @@ void OnMessage(const std::string& message)
             }
 
             auto player_id = uint8_t(long_player_id);
-            ghosts[player_id] = Ghost{ .info = FST_PlayerInfo{ .id = player_id } };
+            ghosts[player_id] = Ghost{ .id = player_id };
         }
  
-        time_stamp = std::chrono::steady_clock::now();
         Log(L"Received Connected message with player id " + std::to_wstring(*id), LogType::Loud);
     }
     else if (field_type == "PlayerJoined")
@@ -344,7 +459,7 @@ void OnMessage(const std::string& message)
         }
 
         auto player_id = uint8_t(long_player_id);
-        ghosts[player_id] = Ghost{ .info = FST_PlayerInfo{ .id = player_id } };
+        ghosts[player_id] = Ghost{ .id = player_id };
         Log(L"Received PlayerJoined message with id " + std::to_wstring(player_id), LogType::Loud);
     }
     else if (field_type == "PlayerLeft")
@@ -395,35 +510,42 @@ void OnError(const std::string& error_message)
 
 void OnRecv(const boost::array<uint8_t, RECV>& buf, size_t len)
 {
-    if (len < MIN_SERVER_PACKET_LEN || len > MAX_SERVER_PACKET_LEN || len % STATE_LEN != HEADER_LEN)
+    if (len < MIN_SERVER_PACKET_LEN || len > MAX_SERVER_PACKET_LEN || len % STATE_LEN != 0)
     {
         Log(L"Received packet of invalid size " + std::to_wstring(len), LogType::Warning);
         return;
     }
 
     size_t pos = 0;
-    uint32_t update_num = DeserializeU32(buf, pos);
-    size_t num_updates = (len - HEADER_LEN) / STATE_LEN;
+    size_t num_updates = len / STATE_LEN;
     for (size_t i = 0; i < num_updates; i++)
     {
         uint8_t player_id = DeserializeU8(buf, pos);
-        if (!ghosts.contains(player_id) || ghosts.at(player_id).update_num >= update_num)
+        if (!ghosts.contains(player_id))
         {
             // skip pos ahead the bytes it would have read for this player
             pos += 19;
             continue;
         }
-
         auto& ghost = ghosts.at(player_id);
-        ghost.zone = DeserializeU32(buf, pos);
-        ghost.info.location_x = DeserializeLocator(buf, pos);
-        ghost.info.location_y = DeserializeLocator(buf, pos);
-        ghost.info.location_z = DeserializeLocator(buf, pos);
-        ghost.info.rotation_x = DeserializeRotator(buf, pos);
-        ghost.info.rotation_y = DeserializeRotator(buf, pos);
-        ghost.info.rotation_z = DeserializeRotator(buf, pos);
-        ghost.update_num = update_num;
-        ghost.updated = true;
+
+        uint32_t ghost_update_num = DeserializeU32(buf, pos);
+        if (!ghost.can_insert(ghost_update_num))
+        {
+            pos += 15;
+            continue;
+        }
+
+        State state{};
+        state.update_num = ghost_update_num;
+        state.zone = DeserializeU32(buf, pos);
+        state.info.location_x = DeserializeLocator(buf, pos);
+        state.info.location_y = DeserializeLocator(buf, pos);
+        state.info.location_z = DeserializeLocator(buf, pos);
+        state.info.rotation_x = DeserializeRotator(buf, pos);
+        state.info.rotation_y = DeserializeRotator(buf, pos);
+        state.info.rotation_z = DeserializeRotator(buf, pos);
+        ghost.insert(state, update_num);
     }
 }
 
@@ -537,6 +659,41 @@ double DeserializeRotator(const boost::array<uint8_t, RECV>& buf, size_t& pos)
 {
     uint8_t byte = DeserializeU8(buf, pos);
     return double(byte) * 360.0 / 256.0 - 180.0;
+}
+
+std::chrono::steady_clock::time_point AdvanceNanos()
+{
+    auto now = std::chrono::steady_clock::now();
+    nanos += (now - *time_stamp).count();
+    time_stamp = now;
+    return now;
+}
+
+bool TrySendUpdate(const FST_PlayerInfo& info)
+{
+    if (nanos / NANOS_PER_UPDATE)
+    {
+        nanos = nanos % NANOS_PER_UPDATE;
+        SendUpdate(info);
+        return true;
+    }
+    return false;
+}
+
+void SendUpdate(const FST_PlayerInfo& info)
+{
+    boost::array<uint8_t, SEND> buf{};
+    size_t pos = 0;
+    SerializeU8(*id, buf, pos);
+    SerializeU32(update_num, buf, pos);
+    SerializeU32(current_zone, buf, pos);
+    SerializeLocator(info.location_x, buf, pos);
+    SerializeLocator(info.location_y, buf, pos);
+    SerializeLocator(info.location_z, buf, pos);
+    SerializeRotator(info.rotation_x, buf, pos);
+    SerializeRotator(info.rotation_y, buf, pos);
+    SerializeRotator(info.rotation_z, buf, pos);
+    udp->Send(buf);
 }
 
 } // namespace

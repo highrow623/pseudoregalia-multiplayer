@@ -1,4 +1,4 @@
-use crate::state::{CLIENT_PACKET_LEN, PlayerState, State};
+use crate::state::{PlayerState, STATE_LEN, State};
 use std::{
     io, process,
     sync::{Arc, Mutex},
@@ -37,18 +37,18 @@ pub async fn tcp(state: Arc<Mutex<State>>, tcp_listener: TcpListener) -> String 
 }
 
 pub async fn udp(state: Arc<Mutex<State>>, udp_socket: UdpSocket) -> String {
-    let mut buf = [0u8; CLIENT_PACKET_LEN];
+    let mut buf = [0u8; STATE_LEN];
     let udp_socket = Arc::new(udp_socket);
     loop {
         match udp_socket.recv_from(&mut buf).await {
             Ok((len, addr)) => {
-                if len != CLIENT_PACKET_LEN {
+                if len != STATE_LEN {
                     println!("{}: received UDP packet of the incorrect length: {}", addr, len);
                     continue;
                 }
                 tokio::spawn(udp::handle_packet(
                     state.clone(),
-                    PlayerState::from_bytes(&buf),
+                    PlayerState::from_bytes(buf),
                     udp_socket.clone(),
                     addr,
                 ));

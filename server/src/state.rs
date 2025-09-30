@@ -1,50 +1,29 @@
 use rand::{Rng, SeedableRng, rngs::SmallRng};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 // arbitrary limit on number of connected players, but this also happens to guarantee that server
 // updates fit in one packet
-const MAX_PLAYERS: usize = 26;
+const MAX_PLAYERS: usize = 22;
 
-// the header consists of an update number and the zone, both 4 bytes long
-pub const HEADER_LEN: usize = 4;
-pub const STATE_LEN: usize = 20;
-pub const CLIENT_PACKET_LEN: usize = HEADER_LEN + STATE_LEN;
+// how many updates to keep for each player
+const MAX_UPDATES: usize = 20;
+
+pub const STATE_LEN: usize = 24;
 
 pub struct PlayerState {
-    update_num: u32,
     bytes: [u8; STATE_LEN],
+    sent_to: HashSet<u8>,
 }
 
 impl PlayerState {
     /// Creates a new PlayerState from its byte representation. Also returns the bytes of the header
     /// and the parsed id.
-    pub fn from_bytes(bytes: &[u8; CLIENT_PACKET_LEN]) -> ([u8; HEADER_LEN], u8, Self) {
-        let header_bytes: [u8; HEADER_LEN] = bytes[..HEADER_LEN].try_into().unwrap();
-        let update_num = u32::from_be_bytes(header_bytes[..].try_into().unwrap());
+    pub fn from_bytes(bytes: [u8; STATE_LEN]) -> (u8, u32, Self) {
+        let id = bytes[0];
+        let update_num = u32::from_be_bytes(bytes[1..5].try_into().unwrap());
 
-        // id is the byte right after the header
-        let id = bytes[HEADER_LEN];
-        let bytes = bytes[HEADER_LEN..].try_into().unwrap();
-
-        (header_bytes, id, Self { update_num, bytes })
-    }
-
-    fn new() -> Self {
-        Self { update_num: 0u32, bytes: [0u8; STATE_LEN] }
-    }
-
-    fn update(&mut self, other: Self) -> bool {
-        if other.update_num > self.update_num {
-            *self = other;
-            true
-        } else {
-            false
-        }
-    }
-
-    fn has_updated(&self) -> bool {
-        self.update_num != 0u32
+        (id, update_num, Self { bytes, sent_to: HashSet::new() })
     }
 }
 
@@ -54,13 +33,27 @@ pub enum ConnectionUpdate {
 }
 
 struct Player {
-    state: PlayerState,
+    states: BTreeMap<u32, PlayerState>,
     tx: UnboundedSender<ConnectionUpdate>,
 }
 
 impl Player {
     fn new(tx: UnboundedSender<ConnectionUpdate>) -> Self {
-        Self { state: PlayerState::new(), tx }
+        Self { states: BTreeMap::new(), tx }
+    }
+
+    fn update(&mut self, update_num: u32, player_state: PlayerState) {
+        // if states is not full, just put it in
+        if self.states.len() < MAX_UPDATES {
+            self.states.insert(update_num, player_state);
+            return;
+        }
+
+        // if states is full, only put it in if it wouldn't be first; then pop first
+        if self.states.first_key_value().unwrap().0 < &update_num {
+            self.states.insert(update_num, player_state);
+            self.states.pop_first();
+        }
     }
 }
 
@@ -119,23 +112,37 @@ impl State {
 
     /// Updates player state if the id corresponds to a connected player and the update number in
     /// player_state is greater than the current number. Returns true if state was updated.
-    pub fn update(&mut self, id: u8, player_state: PlayerState) -> bool {
-        // TODO should this be combined with filtered_state and return Option<Vec<[u8; STATE_LEN]>>?
-        match self.players.get_mut(&id) {
-            Some(player) => player.state.update(player_state),
-            None => false,
-        }
+    pub fn update(
+        &mut self,
+        id: u8,
+        update_num: u32,
+        player_state: PlayerState,
+    ) -> Option<Vec<[u8; STATE_LEN]>> {
+        let Some(player) = self.players.get_mut(&id) else {
+            return None;
+        };
+        player.update(update_num, player_state);
+
+        Some(self.filtered_state(id))
     }
 
     /// Returns the current bytes for every player, skipping the player with id matching the `id`
     /// param and other players that haven't been updated yet.
-    pub fn filtered_state(&self, id: u8) -> Vec<[u8; STATE_LEN]> {
+    fn filtered_state(&mut self, id: u8) -> Vec<[u8; STATE_LEN]> {
         let mut filtered_state = Vec::with_capacity(self.players.len());
-        for (player_id, player) in &self.players {
-            if id == *player_id || !player.state.has_updated() {
+        for (player_id, player) in &mut self.players {
+            if id == *player_id {
                 continue;
             }
-            filtered_state.push(player.state.bytes);
+
+            // get the most recent update that hasn't been sent to the player
+            for state in player.states.values_mut().rev() {
+                if !state.sent_to.contains(&id) {
+                    state.sent_to.insert(id);
+                    filtered_state.push(state.bytes);
+                    break;
+                }
+            }
         }
         filtered_state
     }
