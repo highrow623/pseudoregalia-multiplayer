@@ -14,6 +14,6 @@ pub fn handle_command(_state: &Arc<Mutex<State>>, command: &str) {
             process::exit(0);
         }
         "" => {}
-        _ => println!("unrecognized command: {}", command),
+        _ => println!("unrecognized command: {command}"),
     }
 }

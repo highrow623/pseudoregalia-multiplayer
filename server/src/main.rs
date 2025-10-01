@@ -26,17 +26,17 @@ async fn main() {
     let reason = tokio::select! {
         join_result = tcp_task => {
             match join_result {
-                Ok(reason) => format!("TCP task ended: {}", reason),
-                Err(err) => format!("TCP task crashed: {}", err),
+                Ok(reason) => format!("TCP task ended: {reason}"),
+                Err(err) => format!("TCP task crashed: {err}"),
             }
         }
         join_result = udp_task => {
             match join_result {
-                Ok(reason) => format!("UDP task ended: {}", reason),
-                Err(err) => format!("UDP task crashed: {}", err),
+                Ok(reason) => format!("UDP task ended: {reason}"),
+                Err(err) => format!("UDP task crashed: {err}"),
             }
         }
     };
-    println!("terminating server: {}", reason);
+    println!("terminating server: {reason}");
     process::exit(1);
 }

@@ -45,7 +45,7 @@ pub async fn handle_packet(
 
 async fn send_to(udp_socket: Arc<UdpSocket>, buf: &[u8], addr: SocketAddr) {
     if let Err(err) = udp_socket.send_to(buf, addr).await {
-        println!("error sending UDP packet: {}", err);
+        println!("error sending UDP packet: {err}");
         // TODO resend?? idk
     }
 }

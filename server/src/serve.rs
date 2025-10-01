@@ -19,7 +19,7 @@ pub fn stdin(state: Arc<Mutex<State>>) {
                 buf.clear();
             }
             Err(err) => {
-                println!("terminating server: failed to read stdin: {}", err);
+                println!("terminating server: failed to read stdin: {err}");
                 process::exit(1);
             }
         }
@@ -31,7 +31,7 @@ pub async fn tcp(state: Arc<Mutex<State>>, tcp_listener: TcpListener) -> String 
         match tcp_listener.accept().await {
             Ok((stream, _)) => tokio::spawn(tcp::handle_connection(state.clone(), stream)),
             // TODO does this need to return? or can the listener continue to accept connections?
-            Err(err) => return format!("failed to accept TCP stream: {}", err),
+            Err(err) => return format!("failed to accept TCP stream: {err}"),
         };
     }
 }
@@ -43,7 +43,7 @@ pub async fn udp(state: Arc<Mutex<State>>, udp_socket: UdpSocket) -> String {
         match udp_socket.recv_from(&mut buf).await {
             Ok((len, addr)) => {
                 if len != STATE_LEN {
-                    println!("received UDP packet of the incorrect length: {}", len);
+                    println!("received UDP packet of the incorrect length: {len}");
                     continue;
                 }
                 tokio::spawn(udp::handle_packet(
@@ -54,7 +54,7 @@ pub async fn udp(state: Arc<Mutex<State>>, udp_socket: UdpSocket) -> String {
                 ));
             }
             // TODO does this need to return? or can the socket continue to receive packets?
-            Err(err) => return format!("failed to read UDP socket: {}", err),
+            Err(err) => return format!("failed to read UDP socket: {err}"),
         }
     }
 }

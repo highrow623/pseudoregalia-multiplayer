@@ -104,7 +104,7 @@ impl State {
     /// Removes the player associated with id from state and informs other players that they
     /// disconnected.
     pub fn disconnect(&mut self, id: u8) {
-        if let None = self.players.remove(&id) {
+        if self.players.remove(&id).is_none() {
             // TODO this shouldn't happen, right?
             return;
         }
@@ -122,9 +122,7 @@ impl State {
         update_num: u32,
         player_state: PlayerState,
     ) -> Option<Vec<[u8; STATE_LEN]>> {
-        let Some(player) = self.players.get_mut(&id) else {
-            return None;
-        };
+        let player = self.players.get_mut(&id)?;
         player.update(update_num, player_state);
 
         Some(self.filtered_state(id))
