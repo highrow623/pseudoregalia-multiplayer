@@ -29,7 +29,7 @@ pub fn stdin(state: Arc<Mutex<State>>) {
 pub async fn tcp(state: Arc<Mutex<State>>, tcp_listener: TcpListener) -> String {
     loop {
         match tcp_listener.accept().await {
-            Ok((stream, addr)) => tokio::spawn(tcp::handle_connection(state.clone(), stream, addr)),
+            Ok((stream, _)) => tokio::spawn(tcp::handle_connection(state.clone(), stream)),
             // TODO does this need to return? or can the listener continue to accept connections?
             Err(err) => return format!("failed to accept TCP stream: {}", err),
         };

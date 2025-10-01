@@ -2,8 +2,8 @@ use rand::{Rng, SeedableRng, rngs::SmallRng};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
-// arbitrary limit on number of connected players, but this also happens to guarantee that server
-// updates fit in one packet
+// semi-arbitrary limit on number of connected players, but this guarantees that server updates fit
+// into a single packet
 const MAX_PLAYERS: usize = 22;
 
 // how many updates to keep for each player
@@ -17,12 +17,11 @@ pub struct PlayerState {
 }
 
 impl PlayerState {
-    /// Creates a new PlayerState from its byte representation. Also returns the bytes of the header
-    /// and the parsed id.
+    /// Creates a new PlayerState from its byte representation. Also returns the parsed id and
+    /// update number.
     pub fn from_bytes(bytes: [u8; STATE_LEN]) -> (u8, u32, Self) {
         let id = bytes[0];
         let update_num = u32::from_be_bytes(bytes[1..5].try_into().unwrap());
-
         (id, update_num, Self { bytes, sent_to: HashSet::new() })
     }
 }
@@ -43,6 +42,11 @@ impl Player {
     }
 
     fn update(&mut self, update_num: u32, player_state: PlayerState) {
+        // ignore duplicates
+        if self.states.contains_key(&update_num) {
+            return;
+        }
+
         // if states is not full, just put it in
         if self.states.len() < MAX_UPDATES {
             self.states.insert(update_num, player_state);
@@ -110,8 +114,8 @@ impl State {
         }
     }
 
-    /// Updates player state if the id corresponds to a connected player and the update number in
-    /// player_state is greater than the current number. Returns true if state was updated.
+    /// Updates player state and returns up to one update for each other connected player. Returns
+    /// None if `id` isn't a connected player.
     pub fn update(
         &mut self,
         id: u8,
@@ -126,8 +130,6 @@ impl State {
         Some(self.filtered_state(id))
     }
 
-    /// Returns the current bytes for every player, skipping the player with id matching the `id`
-    /// param and other players that haven't been updated yet.
     fn filtered_state(&mut self, id: u8) -> Vec<[u8; STATE_LEN]> {
         let mut filtered_state = Vec::with_capacity(self.players.len());
         for (player_id, player) in &mut self.players {

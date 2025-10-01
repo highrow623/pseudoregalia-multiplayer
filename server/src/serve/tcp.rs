@@ -1,11 +1,8 @@
 use crate::state::{ConnectionUpdate, State};
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::{
-    net::SocketAddr,
-    sync::{Arc, Mutex},
-};
-use tokio::net::TcpStream;
+use std::sync::{Arc, Mutex};
+use tokio::{net::TcpStream, sync::mpsc::UnboundedReceiver};
 use tokio_tungstenite::WebSocketStream;
 
 #[derive(Serialize)]
@@ -22,49 +19,28 @@ enum ClientMessage {
     Connect,
 }
 
-/// Cleans up connection by disconnecting id from state on drop
-struct DisconnectHandler {
-    state: Arc<Mutex<State>>,
+struct Connection {
+    ws_stream: WebSocketStream<TcpStream>,
     id: u8,
+    rx: UnboundedReceiver<ConnectionUpdate>,
+    state: Arc<Mutex<State>>,
 }
 
-impl Drop for DisconnectHandler {
+impl Drop for Connection {
     fn drop(&mut self) {
         self.state.lock().unwrap().disconnect(self.id);
     }
 }
 
-pub async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, addr: SocketAddr) {
-    println!("{}: incoming TCP connection", addr);
-
-    let mut ws_stream = match tokio_tungstenite::accept_async(raw_stream).await {
-        Ok(ws_stream) => ws_stream,
+pub async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream) {
+    let mut connection = match receive_connection(state, raw_stream).await {
+        Ok(connection) => connection,
         Err(err) => {
-            println!("{}: error during WebSocket handshake occured: {}", addr, err);
+            println!("connection refused: {}", err);
             return;
         }
     };
-    println!("{}: established WebSocket connection", addr);
-
-    if let Err(err) = receive_connect_message(&mut ws_stream).await {
-        println!("{}: failed to receive connect message: {}", addr, err);
-        return;
-    }
-    println!("{}: received Connect message", addr);
-
-    let Some((id, mut rx, players)) = state.lock().unwrap().connect() else {
-        // TODO send an error message to the client and allow them to try again
-        println!("{}: id collision error", addr);
-        return;
-    };
-    let _disconnect_handler = DisconnectHandler { state: state.clone(), id };
-
-    let msg = ServerMessage::Connected { id, players };
-    let msg = serde_json::to_string(&msg).unwrap();
-    if let Err(err) = ws_stream.send(msg.into()).await {
-        println!("{}: error sending connected message: {}", addr, err);
-        return;
-    }
+    println!("{:02x}: connection established", connection.id);
 
     // arbitrary, but probably more than enough to handle all updates available at a time
     let limit = 16;
@@ -73,12 +49,12 @@ pub async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, 
         tokio::select! {
             // ignore the number returned because buf is guaranteed to be empty as
             // send_connection_updates drains all of buf
-            _ = rx.recv_many(&mut buf, limit) => {
-                if let Err(err) = send_connection_updates(&mut ws_stream, &mut buf).await {
+            _ = connection.rx.recv_many(&mut buf, limit) => {
+                if let Err(err) = send_updates(&mut connection.ws_stream, &mut buf).await {
                     break format!("failed to send connection updates: {}", err);
                 }
             }
-            msg = ws_stream.next() => {
+            msg = connection.ws_stream.next() => {
                 let Some(msg) = msg else {
                     break "stream reader closed".to_owned();
                 };
@@ -94,7 +70,30 @@ pub async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream, 
             }
         }
     };
-    println!("{}: disconnected: {}", addr, reason);
+    println!("{:02x}: disconnected: {}", connection.id, reason);
+}
+
+async fn receive_connection(
+    state: Arc<Mutex<State>>,
+    raw_stream: TcpStream,
+) -> Result<Connection, String> {
+    let mut ws_stream = tokio_tungstenite::accept_async(raw_stream)
+        .await
+        .map_err(|e| format!("error during WebSocket handshake occured: {}", e))?;
+    receive_connect_message(&mut ws_stream)
+        .await
+        .map_err(|e| format!("failed to receive connect message: {}", e))?;
+    let (id, rx, players) = state.lock().unwrap().connect().ok_or("server full".to_owned())?;
+    let mut connection = Connection { ws_stream, id, rx, state };
+
+    let msg = ServerMessage::Connected { id, players };
+    let msg = serde_json::to_string(&msg).unwrap();
+    connection
+        .ws_stream
+        .send(msg.into())
+        .await
+        .map_err(|e| format!("{:02x}: error sending connected message: {}", id, e))?;
+    Ok(connection)
 }
 
 async fn receive_connect_message(ws_stream: &mut WebSocketStream<TcpStream>) -> Result<(), String> {
@@ -124,7 +123,7 @@ async fn receive_connect_message(ws_stream: &mut WebSocketStream<TcpStream>) -> 
     }
 }
 
-async fn send_connection_updates(
+async fn send_updates(
     ws_stream: &mut WebSocketStream<TcpStream>,
     buf: &mut Vec<ConnectionUpdate>,
 ) -> Result<(), String> {
