@@ -43,7 +43,7 @@ pub async fn udp(state: Arc<Mutex<State>>, udp_socket: UdpSocket) -> String {
         match udp_socket.recv_from(&mut buf).await {
             Ok((len, addr)) => {
                 if len != STATE_LEN {
-                    println!("{}: received UDP packet of the incorrect length: {}", addr, len);
+                    println!("received UDP packet of the incorrect length: {}", len);
                     continue;
                 }
                 tokio::spawn(udp::handle_packet(
