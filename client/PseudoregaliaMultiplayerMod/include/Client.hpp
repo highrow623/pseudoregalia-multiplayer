@@ -10,6 +10,6 @@ namespace Client
 {
     void OnSceneLoad(std::wstring);
     void Tick();
-    void SetPlayerInfo(const FST_PlayerInfo&);
-    void GetGhostInfo(RC::Unreal::TArray<FST_PlayerInfo>&, RC::Unreal::TArray<uint8_t>&);
+    uint32_t SetPlayerInfo(const FST_PlayerInfo&);
+    void GetGhostInfo(const uint32_t&, RC::Unreal::TArray<FST_PlayerInfo>&, RC::Unreal::TArray<uint8_t>&);
 }

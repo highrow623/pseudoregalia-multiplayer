@@ -48,7 +48,7 @@ public:
                         Log(L"Could not find function \"SyncInfo\" in \"BP_PM_Manager_C\"", LogType::Error);
                         return;
                     }
-                    RC::Unreal::UObjectGlobals::RegisterHook(func, sync_player_info, sync_ghost_info, nullptr);
+                    RC::Unreal::UObjectGlobals::RegisterHook(func, sync_info, nop, nullptr);
                     Log(L"Registered hook for \"SyncInfo\" in \"BP_PM_Manager_C\"", LogType::Loud);
                     sync_items_hooked = true;
                 }
@@ -61,21 +61,18 @@ public:
         Client::Tick();
     }
 
-    static void sync_player_info(RC::Unreal::UnrealScriptFunctionCallableContext& context, void* customdata)
+    static void sync_info(RC::Unreal::UnrealScriptFunctionCallableContext& context, void* customdata)
     {
-        auto& player_info = context.GetParams<FST_PlayerInfo>();
-        Client::SetPlayerInfo(player_info);
-    }
+        const auto& player_info = context.GetParams<FST_PlayerInfo>();
+        auto update_num = Client::SetPlayerInfo(player_info);
 
-    static void sync_ghost_info(RC::Unreal::UnrealScriptFunctionCallableContext& context, void* customdata)
-    {
         struct UpdateGhostsParams
         {
             RC::Unreal::TArray<FST_PlayerInfo> ghost_info;
             RC::Unreal::TArray<uint8_t> to_remove;
         };
         auto params = std::make_unique<UpdateGhostsParams>();
-        Client::GetGhostInfo(params->ghost_info, params->to_remove);
+        Client::GetGhostInfo(update_num, params->ghost_info, params->to_remove);
         if (params->ghost_info.Num() == 0 && params->to_remove.Num() == 0)
         {
             return;
@@ -88,6 +85,10 @@ public:
             return;
         }
         context.Context->ProcessEvent(update_ghosts, params.get());
+    }
+
+    static void nop(RC::Unreal::UnrealScriptFunctionCallableContext& context, void* customdata)
+    {
     }
 };
 

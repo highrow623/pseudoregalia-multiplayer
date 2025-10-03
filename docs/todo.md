@@ -3,7 +3,6 @@
 ## For initial release
 
 * use resolver for udp socket to accept domains
-* recalculate update number when receiving a packet to get a more accurate offset calculation
 * make a release
 * finish writing docs
   * running the server

@@ -39,9 +39,12 @@ namespace
 
     std::wstring ToWide(const std::string&);
     uint32_t HashW(const std::wstring&);
-    std::chrono::steady_clock::time_point AdvanceNanos();
-    bool TrySendUpdate(const FST_PlayerInfo&);
-    void SendUpdate(const FST_PlayerInfo&);
+
+    typedef std::chrono::steady_clock::time_point steady_time_point;
+    uint32_t MillisSinceStart(const steady_time_point&);
+    steady_time_point AdvanceNanos();
+    bool TrySendUpdate(const FST_PlayerInfo&, const uint32_t&);
+    void SendUpdate(const FST_PlayerInfo&, const uint32_t&);
 
     void SerializeU8(uint8_t, boost::array<uint8_t, SEND>&, size_t&);
     void SerializeU32(uint32_t, boost::array<uint8_t, SEND>&, size_t&);
@@ -144,25 +147,25 @@ namespace
             return cached_state;
         }
 
-        State get_closest(const uint32_t& update_num) const
+        State get_closest(const uint32_t& ghost_update_num) const
         {
-            if (update_num <= states.front().update_num)
+            if (ghost_update_num <= states.front().update_num)
             {
                 return states.front();
             }
-            if (update_num >= states.back().update_num)
+            if (ghost_update_num >= states.back().update_num)
             {
                 return states.back();
             }
 
-            auto ge = [&](const State& state) { return state.update_num >= update_num; };
+            auto ge = [&](const State& state) { return state.update_num >= ghost_update_num; };
             auto it = std::find_if(states.cbegin(), states.cend(), ge);
             const State& upper = *it;
             --it;
             const State& lower = *it;
 
-            uint32_t lower_dist = update_num - lower.update_num;
-            uint32_t upper_dist = upper.update_num - update_num;
+            uint32_t lower_dist = ghost_update_num - lower.update_num;
+            uint32_t upper_dist = upper.update_num - ghost_update_num;
             bool lower_is_closer = lower_dist < upper_dist;
             if (lower.zone != upper.zone)
             {
@@ -185,27 +188,26 @@ namespace
                     .id = id,
                 },
                 .zone = lower.zone,
-                .update_num = update_num,
+                .update_num = ghost_update_num,
             };
         }
     };
 
     uint32_t current_zone;
-    std::optional<FST_PlayerInfo> player_info = {};
+    // if an update isn't ready to be sent when created, it gets stored here
+    std::optional<std::pair<FST_PlayerInfo, uint32_t>> queued_update = {};
 
     // the id given in the Connected message; this value being defined means a full connection has been established
     std::optional<uint8_t> id = {};
-    uint32_t update_num = 0;
     std::unordered_map<uint8_t, Ghost> ghosts = {};
     std::unordered_set<uint8_t> spawned_ghosts = {};
 
     // about 1/60 seconds, in nanoseconds because that's what steady_clock uses
     const int64_t NANOS_PER_UPDATE = 16666667;
-    // marks the time the first update was sent after connecting
-    std::optional<std::chrono::steady_clock::time_point> start = {};
-    // marks the last time the client checked if it could send an update; used to increment nanos
-    std::optional<std::chrono::steady_clock::time_point> time_stamp = {};
-    // keeps track of nanoseconds accrued for updates, an update can only be only fired if it exceeds NANOS_PER_UPDATE
+    // the first value marks the time the first update was sent after connecting; the second value marks the last time
+    // the client checked if it could send an update and is used to increment nanos
+    std::optional<std::pair<steady_time_point, steady_time_point>> timers = {};
+    // keeps track of nanoseconds accrued for updates; an update can only be fired if it exceeds NANOS_PER_UPDATE
     int64_t nanos = 0;
 }
 
@@ -236,12 +238,10 @@ void Client::Tick()
             udp = nullptr;
 
             id.reset();
-            update_num = 0;
             ghosts.clear();
             // don't clear spawned_ghosts because we need to tell the bp mod to delete the actors
 
-            time_stamp.reset();
-            start.reset();
+            timers.reset();
             nanos = 0;
         }
         queue_disconnect = false;
@@ -276,15 +276,15 @@ void Client::Tick()
         }
         queue_connect = false;
     }
-    if (id && time_stamp)
+    if (id && timers)
     {
         AdvanceNanos();
-        if (player_info)
+        if (queued_update)
         {
-            bool sent = TrySendUpdate(*player_info);
+            bool sent = TrySendUpdate(queued_update->first, queued_update->second);
             if (sent)
             {
-                player_info.reset();
+                queued_update.reset();
             }
         }
     }
@@ -295,34 +295,37 @@ void Client::Tick()
     }
 }
 
-void Client::SetPlayerInfo(const FST_PlayerInfo& info)
+uint32_t Client::SetPlayerInfo(const FST_PlayerInfo& info)
 {
     if (!id)
     {
-        return;
+        return 0u;
     }
-    if (!start)
+    if (timers)
     {
-        start = std::chrono::steady_clock::now();
-        time_stamp = start;
-        SendUpdate(info);
+        auto now = AdvanceNanos();
+        auto update_num = MillisSinceStart(now);
+        bool sent = TrySendUpdate(info, update_num);
+        if (!sent)
+        {
+            queued_update = { info, update_num };
+        }
+        return update_num;
     }
     else
     {
-        auto now = AdvanceNanos();
-        // convert nanos since start to millis since start
-        update_num = uint32_t((now - *start).count() / 1000000);
-
-        bool sent = TrySendUpdate(info);
-        if (!sent)
-        {
-            player_info = info;
-        }
+        auto now = std::chrono::steady_clock::now();
+        timers = { now, now };
+        SendUpdate(info, 0u);
+        return 0u;
     }
 }
 
-void Client::GetGhostInfo(RC::Unreal::TArray<FST_PlayerInfo>& ghost_info, RC::Unreal::TArray<uint8_t>& to_remove)
-{
+void Client::GetGhostInfo(
+    const uint32_t& update_num,
+    RC::Unreal::TArray<FST_PlayerInfo>& ghost_info,
+    RC::Unreal::TArray<uint8_t>& to_remove
+) {
     for (auto& [id, ghost] : ghosts)
     {
         const auto& state = ghost.refresh_state(update_num);
@@ -541,6 +544,12 @@ void OnRecv(const boost::array<uint8_t, RECV>& buf, size_t len)
         return;
     }
 
+    if (!timers)
+    {
+        return;
+    }
+    auto update_num = MillisSinceStart(std::chrono::steady_clock::now());
+
     size_t pos = 0;
     size_t num_updates = len / STATE_LEN;
     for (size_t i = 0; i < num_updates; i++)
@@ -686,26 +695,36 @@ double DeserializeRotator(const boost::array<uint8_t, RECV>& buf, size_t& pos)
     return double(byte) * 360.0 / 256.0 - 180.0;
 }
 
-std::chrono::steady_clock::time_point AdvanceNanos()
+// Calculates milliseconds since the first update. This function should only be called if timers has a value.
+uint32_t MillisSinceStart(const steady_time_point& now)
+{
+    return uint32_t((now - timers->first).count() / 1000000ll);
+}
+
+// Increments nanos based on the amount of time that has passed since the last time this function was called. This
+// function should only be called if timers has a value. Returns now.
+steady_time_point AdvanceNanos()
 {
     auto now = std::chrono::steady_clock::now();
-    nanos += (now - *time_stamp).count();
-    time_stamp = now;
+    nanos += (now - timers->second).count();
+    timers->second = now;
     return now;
 }
 
-bool TrySendUpdate(const FST_PlayerInfo& info)
+// Sends an update if enough nanos have been accrued. Returns whether an update was sent.
+bool TrySendUpdate(const FST_PlayerInfo& info, const uint32_t& update_num)
 {
     if (nanos / NANOS_PER_UPDATE)
     {
         nanos = nanos % NANOS_PER_UPDATE;
-        SendUpdate(info);
+        SendUpdate(info, update_num);
         return true;
     }
     return false;
 }
 
-void SendUpdate(const FST_PlayerInfo& info)
+// Sends an update.
+void SendUpdate(const FST_PlayerInfo& info, const uint32_t& update_num)
 {
     boost::array<uint8_t, SEND> buf{};
     size_t pos = 0;
