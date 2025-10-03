@@ -6,10 +6,9 @@
 * recalculate update number when receiving a packet to get a more accurate offset calculation
 * make a release
 * finish writing docs
-  * readme
   * running the server
   * c++ mod section of build instructions
-  * links to releases in installing the mod
+  * links to releases page in installing the mod and readme
 * add license
 * make the repo public
 
