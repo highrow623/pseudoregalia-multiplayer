@@ -64,7 +64,7 @@ public:
     static void sync_info(RC::Unreal::UnrealScriptFunctionCallableContext& context, void* customdata)
     {
         const auto& player_info = context.GetParams<FST_PlayerInfo>();
-        auto update_num = Client::SetPlayerInfo(player_info);
+        auto millis = Client::SetPlayerInfo(player_info);
 
         struct UpdateGhostsParams
         {
@@ -72,7 +72,7 @@ public:
             RC::Unreal::TArray<uint8_t> to_remove;
         };
         auto params = std::make_unique<UpdateGhostsParams>();
-        Client::GetGhostInfo(update_num, params->ghost_info, params->to_remove);
+        Client::GetGhostInfo(millis, params->ghost_info, params->to_remove);
         if (params->ghost_info.Num() == 0 && params->to_remove.Num() == 0)
         {
             return;

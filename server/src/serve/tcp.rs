@@ -47,8 +47,8 @@ pub async fn handle_connection(state: Arc<Mutex<State>>, raw_stream: TcpStream) 
     let mut buf = Vec::with_capacity(limit);
     let reason = loop {
         tokio::select! {
-            // ignore the number returned because buf is guaranteed to be empty as
-            // send_connection_updates drains all of buf
+            // ignore the number returned because buf is guaranteed to be empty as send_updates
+            // drains all of buf
             _ = connection.rx.recv_many(&mut buf, limit) => {
                 if let Err(err) = send_updates(&mut connection.ws_stream, &mut buf).await {
                     break format!("failed to send connection updates: {err}");

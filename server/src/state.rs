@@ -18,11 +18,11 @@ pub struct PlayerState {
 
 impl PlayerState {
     /// Creates a new PlayerState from its byte representation. Also returns the parsed id and
-    /// update number.
+    /// millis.
     pub fn from_bytes(bytes: [u8; STATE_LEN]) -> (u8, u32, Self) {
         let id = bytes[0];
-        let update_num = u32::from_be_bytes(bytes[1..5].try_into().unwrap());
-        (id, update_num, Self { bytes, sent_to: HashSet::new() })
+        let millis = u32::from_be_bytes(bytes[1..5].try_into().unwrap());
+        (id, millis, Self { bytes, sent_to: HashSet::new() })
     }
 }
 
@@ -41,21 +41,21 @@ impl Player {
         Self { states: BTreeMap::new(), tx }
     }
 
-    fn update(&mut self, update_num: u32, player_state: PlayerState) {
+    fn update(&mut self, millis: u32, player_state: PlayerState) {
         // ignore duplicates
-        if self.states.contains_key(&update_num) {
+        if self.states.contains_key(&millis) {
             return;
         }
 
         // if states is not full, just put it in
         if self.states.len() < MAX_UPDATES {
-            self.states.insert(update_num, player_state);
+            self.states.insert(millis, player_state);
             return;
         }
 
         // if states is full, only put it in if it wouldn't be first; then pop first
-        if self.states.first_key_value().unwrap().0 < &update_num {
-            self.states.insert(update_num, player_state);
+        if self.states.first_key_value().unwrap().0 < &millis {
+            self.states.insert(millis, player_state);
             self.states.pop_first();
         }
     }
@@ -119,11 +119,11 @@ impl State {
     pub fn update(
         &mut self,
         id: u8,
-        update_num: u32,
+        millis: u32,
         player_state: PlayerState,
     ) -> Option<Vec<[u8; STATE_LEN]>> {
         let player = self.players.get_mut(&id)?;
-        player.update(update_num, player_state);
+        player.update(millis, player_state);
 
         Some(self.filtered_state(id))
     }

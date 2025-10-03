@@ -59,8 +59,8 @@ The `PlayerLeft` message is sent when a connected player disconnects from the se
 
 After establishing a WebSocket connection and receiving a `Connected` packet, clients send a UDP packet every frame to inform the server of their current state. The update is 24 bytes long and has the following format:
 
-* Player id (unsigned 8-bit integer, 1 bytes): the id of the player that was received in the `Connected` packet. The server rejects the packet if the id does not match a connected player.
-* Update number (unsigned 32-bit integer, 4 bytes): this represents the number of milliseconds between when the client started sending updates to now. The server keeps the most recent N updates. (Currently, N = 20.)
+* Player id (unsigned 8-bit integer, 1 byte): the id of the player that was received in the `Connected` packet. The server rejects the packet if the id does not match a connected player.
+* Milliseconds (unsigned 32-bit integer, 4 bytes): this represents the number of milliseconds between when the client started sending updates to now. The server keeps the most recent N updates. (Currently, N = 20.)
 * Zone (unsigned 32-bit integer, 4 bytes): a hash of the zone the player is in. The hash is calculated client-side and used by the client to determine whether another player is in the same zone.
 * Transform (15 bytes):
   * Location: the location component of the player's transform, represented by three 32-bit floating point numbers (12 bytes).
@@ -69,7 +69,7 @@ After establishing a WebSocket connection and receiving a `Connected` packet, cl
 Notes:
 
 * Each number in the update is in big endian format.
-* After player id and update number, the server doesn't do anything with the data except store it and pass it along to other players.
+* After player id and milliseconds, the server doesn't do anything with the data except store it and pass it along to other players.
 * Each value in the rotation component of the transform stays between -180.0 and 180.0. The update translates that to an unsigned 8-bit integer, so -180 would map to 0 and just under 180 would map to 255.
 * I did a bit of testing and found that the scale component of the transform seems to always be (1.0, 1.0, 1.0), so it is not included in the update.
 
@@ -83,4 +83,4 @@ Notes:
 * Currently the server caps the number of players at 22 so that all player updates will fit in a single packet, but both the client and server should correctly handle updates being sent over multiple packets.
 * This format sends unnecessary data, as it will still send the transform for a player in a different zone. This could be improved, but would require a more complicated message format. I'll come back to this later.
 
-The client keeps track of the most recent N updates for each player (currently, N = 20). It calculates the average difference between its own update number and that of each other player to determine which update to play each frame.
+The client keeps track of the most recent N updates for each player (currently, N = 20). It calculates the average difference between its own millisecond counter and that of each other player to determine which update to play each frame.

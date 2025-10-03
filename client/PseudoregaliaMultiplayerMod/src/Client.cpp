@@ -66,16 +66,16 @@ namespace
     const size_t MAX_STATES = 20;
     const size_t MAX_OFFSETS = 100;
 
-    // some value in milliseconds to buffer when calculating update number to use for ghosts; causes delay, which can
+    // some value in milliseconds to buffer when calculating millis to use for ghosts; causes delay, which can
     // allow more time for packets to arrive
     // TODO make this configurable, or auto calculate per ghost?
-    const int64_t UPDATE_NUM_BUFFER = 100;
+    const int64_t GHOST_MILLIS_BUFFER = 100;
 
     struct State
     {
         FST_PlayerInfo info;
         uint32_t zone;
-        uint32_t update_num;
+        uint32_t millis;
     };
 
     struct Ghost
@@ -83,29 +83,29 @@ namespace
         uint8_t id = 0;
         std::list<State> states;
 
-        // offsets provide a way to figure out syncing. the offset is meant to describe how far off a player's update
-        // number is from our own. these two fields let us easily check the average offset over the last MAX_OFFSETS
-        // messages received
+        // offsets provide a way to figure out syncing. the offset is meant to guess at how far off a player's
+        // millisecond counter is from our own. these two fields let us easily check the average offset over the last
+        // MAX_OFFSETS messages received
         int64_t total_offset = 0;
         std::deque<uint64_t> offsets;
 
         State cached_state{};
 
-        bool can_insert(uint32_t update_num) const
+        bool can_insert(uint32_t ghost_millis) const
         {
-            auto eq = [&](const State& state) { return state.update_num == update_num; };
+            auto eq = [&](const State& state) { return state.millis == ghost_millis; };
             return std::find_if(states.begin(), states.end(), eq) == states.end()
-                && (states.size() < MAX_STATES || states.front().update_num < update_num);
+                && (states.size() < MAX_STATES || states.front().millis < ghost_millis);
         }
 
         // should only be called if can_insert returns true; otherwise states can include duplicates or this function
         // can be unnecessarily called with a state that would be dropped anyway
-        void insert(State& s, const uint32_t& update_num)
+        void insert(State& s, const uint32_t& millis)
         {
             // this is a new latest state, so update offset calculation
-            if (states.size() == 0 || s.update_num > states.back().update_num)
+            if (states.size() == 0 || s.millis > states.back().millis)
             {
-                int64_t offset = int64_t(s.update_num) - int64_t(update_num);
+                int64_t offset = int64_t(s.millis) - int64_t(millis);
                 total_offset += offset;
                 offsets.push_back(offset);
                 if (offsets.size() > MAX_OFFSETS)
@@ -117,9 +117,9 @@ namespace
 
             s.info.id = id;
 
-            // insert after the first element that has a lower update_num to keep the list sorted
+            // insert after the first element that has a lower millis to keep the list sorted
             // reverse find because we're more likely to be inserting towards the back of the list
-            auto less = [&](const State& state) { return state.update_num < s.update_num; };
+            auto less = [&](const State& state) { return state.millis < s.millis; };
             auto it = std::find_if(states.rbegin(), states.rend(), less);
             states.insert(it.base(), s);
 
@@ -134,7 +134,7 @@ namespace
             return cached_state;
         }
 
-        std::optional<State> refresh_state(const uint32_t& update_num)
+        std::optional<State> refresh_state(const uint32_t& millis)
         {
             if (states.size() == 0 || offsets.size() == 0)
             {
@@ -142,30 +142,30 @@ namespace
             }
 
             int64_t average_offset = total_offset / int64_t(offsets.size());
-            uint32_t ghost_update_num = uint32_t(int64_t(update_num) + average_offset - UPDATE_NUM_BUFFER);
-            cached_state = get_closest(ghost_update_num);
+            uint32_t ghost_millis = uint32_t(int64_t(millis) + average_offset - GHOST_MILLIS_BUFFER);
+            cached_state = get_closest(ghost_millis);
             return cached_state;
         }
 
-        State get_closest(const uint32_t& ghost_update_num) const
+        State get_closest(const uint32_t& ghost_millis) const
         {
-            if (ghost_update_num <= states.front().update_num)
+            if (ghost_millis <= states.front().millis)
             {
                 return states.front();
             }
-            if (ghost_update_num >= states.back().update_num)
+            if (ghost_millis >= states.back().millis)
             {
                 return states.back();
             }
 
-            auto ge = [&](const State& state) { return state.update_num >= ghost_update_num; };
+            auto ge = [&](const State& state) { return state.millis >= ghost_millis; };
             auto it = std::find_if(states.cbegin(), states.cend(), ge);
             const State& upper = *it;
             --it;
             const State& lower = *it;
 
-            uint32_t lower_dist = ghost_update_num - lower.update_num;
-            uint32_t upper_dist = upper.update_num - ghost_update_num;
+            uint32_t lower_dist = ghost_millis - lower.millis;
+            uint32_t upper_dist = upper.millis - ghost_millis;
             bool lower_is_closer = lower_dist < upper_dist;
             if (lower.zone != upper.zone)
             {
@@ -188,7 +188,7 @@ namespace
                     .id = id,
                 },
                 .zone = lower.zone,
-                .update_num = ghost_update_num,
+                .millis = ghost_millis,
             };
         }
     };
@@ -304,13 +304,13 @@ uint32_t Client::SetPlayerInfo(const FST_PlayerInfo& info)
     if (timers)
     {
         auto now = AdvanceNanos();
-        auto update_num = MillisSinceStart(now);
-        bool sent = TrySendUpdate(info, update_num);
+        auto millis = MillisSinceStart(now);
+        bool sent = TrySendUpdate(info, millis);
         if (!sent)
         {
-            queued_update = { info, update_num };
+            queued_update = { info, millis };
         }
-        return update_num;
+        return millis;
     }
     else
     {
@@ -322,13 +322,13 @@ uint32_t Client::SetPlayerInfo(const FST_PlayerInfo& info)
 }
 
 void Client::GetGhostInfo(
-    const uint32_t& update_num,
+    const uint32_t& millis,
     RC::Unreal::TArray<FST_PlayerInfo>& ghost_info,
     RC::Unreal::TArray<uint8_t>& to_remove
 ) {
     for (auto& [id, ghost] : ghosts)
     {
-        const auto& state = ghost.refresh_state(update_num);
+        const auto& state = ghost.refresh_state(millis);
         if (!state || state->zone != current_zone)
         {
             continue;
@@ -548,7 +548,7 @@ void OnRecv(const boost::array<uint8_t, RECV>& buf, size_t len)
     {
         return;
     }
-    auto update_num = MillisSinceStart(std::chrono::steady_clock::now());
+    auto millis = MillisSinceStart(std::chrono::steady_clock::now());
 
     size_t pos = 0;
     size_t num_updates = len / STATE_LEN;
@@ -563,15 +563,15 @@ void OnRecv(const boost::array<uint8_t, RECV>& buf, size_t len)
         }
         auto& ghost = ghosts.at(player_id);
 
-        uint32_t ghost_update_num = DeserializeU32(buf, pos);
-        if (!ghost.can_insert(ghost_update_num))
+        uint32_t ghost_millis = DeserializeU32(buf, pos);
+        if (!ghost.can_insert(ghost_millis))
         {
             pos += 15;
             continue;
         }
 
         State state{};
-        state.update_num = ghost_update_num;
+        state.millis = ghost_millis;
         state.zone = DeserializeU32(buf, pos);
         state.info.location_x = DeserializeLocator(buf, pos);
         state.info.location_y = DeserializeLocator(buf, pos);
@@ -579,7 +579,7 @@ void OnRecv(const boost::array<uint8_t, RECV>& buf, size_t len)
         state.info.rotation_x = DeserializeRotator(buf, pos);
         state.info.rotation_y = DeserializeRotator(buf, pos);
         state.info.rotation_z = DeserializeRotator(buf, pos);
-        ghost.insert(state, update_num);
+        ghost.insert(state, millis);
     }
 }
 
@@ -712,24 +712,24 @@ steady_time_point AdvanceNanos()
 }
 
 // Sends an update if enough nanos have been accrued. Returns whether an update was sent.
-bool TrySendUpdate(const FST_PlayerInfo& info, const uint32_t& update_num)
+bool TrySendUpdate(const FST_PlayerInfo& info, const uint32_t& millis)
 {
     if (nanos / NANOS_PER_UPDATE)
     {
         nanos = nanos % NANOS_PER_UPDATE;
-        SendUpdate(info, update_num);
+        SendUpdate(info, millis);
         return true;
     }
     return false;
 }
 
 // Sends an update.
-void SendUpdate(const FST_PlayerInfo& info, const uint32_t& update_num)
+void SendUpdate(const FST_PlayerInfo& info, const uint32_t& millis)
 {
     boost::array<uint8_t, SEND> buf{};
     size_t pos = 0;
     SerializeU8(*id, buf, pos);
-    SerializeU32(update_num, buf, pos);
+    SerializeU32(millis, buf, pos);
     SerializeU32(current_zone, buf, pos);
     SerializeLocator(info.location_x, buf, pos);
     SerializeLocator(info.location_y, buf, pos);
