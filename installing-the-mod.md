@@ -8,7 +8,7 @@ Installation steps:
 * If you have UE4SS installed but not `pseudoregalia-archipelago`, start with the [cleaning up UE4SS](#cleaning-up-ue4ss) section, then read the [installing fresh](#installing-fresh) section.
 * If you don't have UE4SS installed, just follow the steps in the [installing fresh](#installing-fresh) section.
 
-After the mod is installed, check out the [configuring the client](#configuring-the-client) section to set the server information.
+After the mod is installed, check out the [configuring the client](#configuring-the-client) section to set the server information. The mod will automatically connect to the server when loading into a save file.
 
 If you want to uninstall, check out the [uninstalling the mod](#uninstalling-the-mod) section.
 
