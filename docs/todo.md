@@ -2,8 +2,16 @@
 
 ## For initial release
 
+* use resolver for udp socket to accept domains
+* recalculate update number when receiving a packet to get a more accurate offset calculation
+* make a release
 * finish writing docs
+  * readme
+  * running the server
+  * c++ mod section of build instructions
+  * links to releases in installing the mod
 * add license
+* make the repo public
 
 ## Other
 
@@ -13,7 +21,7 @@
 * better logging/error handling
 * animations?? options to look into:
   * just use animation sequences, send a "best guess" to sync animation state
-  * reuse animation bp or player controller, sync whatever data is needed for animations
+  * reuse animation bp and/or player controller, sync whatever data is needed for animations
   * make new animation bp
 * also send dream breaker? or at least attach it to ghost sybil when that player is holding it
 * name tags or some ui to say who is connected and which level they are in

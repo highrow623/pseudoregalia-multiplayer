@@ -2,7 +2,7 @@
 
 Communication between client and server consists of both WebSocket messages and UDP packets. The client first establishes a WebSocket connection, which the server uses to send important but less frequent updates. The client and server then trade UDP packets with the frame-by-frame data to sync state.
 
-I've decided to go with this for now because I like using UDP for the state updates, but I didn't want to write my own "connection based, in order, guaranteed delivery" protocol on top of UDP. I can get that from WebSockets relatively easily (from a dev perspective anyway).
+I've decided to go with this for now because I like using UDP for the state updates, but I didn't want to write my own "connection based, in order, guaranteed delivery" protocol on top of UDP. I can get that from WebSockets relatively easily (from a dev perspective anyway). This is admittedly kinda lazy, and it would probably be good to switch to UDP only at some point, but this works for now.
 
 # WebSocket Scheme
 
@@ -75,11 +75,12 @@ Notes:
 
 ## Server to Client Packets
 
-Once an update is accepted by the server, the server sends one or more UDP packets with the current state of other connected players in the same zone. An update is `24 * num_updates` bytes long. Each update is in the same format as a client to server packet, with at most one update per player per packet. When responding to a client packet, the server will send the most recent update it hasn't already tried to send for each other player.
+Once an update is accepted by the server, the server sends one or more UDP packets with the state of other connected players. An update is `24 * num_updates` bytes long. Each update is in the same format as a client to server packet, with at most one update per player per packet, and a server packet just looks like several player updates in a row. When responding to a client packet, the server will send the most recent update it hasn't already tried to send for each other player.
+
 Notes:
 
 * `num_updates` will always be between 1 and 21, inclusive. So an update will have minimum length 24 and maximum length 504, and the length of an update mod 24 will always be 0.
-* Currently the server caps the number of players at 22 so that all players will fit in a single update.
+* Currently the server caps the number of players at 22 so that all player updates will fit in a single packet, but both the client and server should correctly handle updates being sent over multiple packets.
 * This format sends unnecessary data, as it will still send the transform for a player in a different zone. This could be improved, but would require a more complicated message format. I'll come back to this later.
 
 The client keeps track of the most recent N updates for each player (currently, N = 20). It calculates the average difference between its own update number and that of each other player to determine which update to play each frame.
