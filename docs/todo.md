@@ -1,6 +1,5 @@
 # TODO
 
-* add license
 * write the [running the server](../running-the-server.md) guide
 * try reconnecting to the server when an error happens instead of only on scene load
 * use JSON schema in cpp mod instead of parsing for errors manually?
@@ -23,3 +22,4 @@
   * improve server message format so it doesn't send unnecessary data, like:
     * the transform for players in different zones
     * the transform for players that aren't moving
+    * the zone if it didn't change from last update?
