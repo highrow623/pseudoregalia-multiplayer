@@ -3,8 +3,10 @@
 There are three main components to this project:
 
 1. `client/pseudoregalia`: the Unreal project for the BP mod
-2. `client/PseudoregaliaMultiplayerMod`: the C++ project for the UE4SS mod
-3. `server`: the server, written in Rust
+
+1. `client/PseudoregaliaMultiplayerMod`: the C++ project for the UE4SS mod
+
+1. `server`: the server, written in Rust
 
 The BP mod contains blueprints for the ghost and manager actors. The manager collects player data each frame and handles updating the ghosts. The BP mod is loaded with UE4SS' BPModLoaderMod.
 

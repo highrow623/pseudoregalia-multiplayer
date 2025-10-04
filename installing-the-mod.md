@@ -17,8 +17,10 @@ If you want to uninstall, check out the [uninstalling the mod](#uninstalling-the
 If you have `pseudoregalia-archipelago` installed, then you already have the version of UE4SS that this mod is compatible with.
 
 1. Download `pseudoregalia-multiplayer.zip` from the [Releases](https://github.com/highrow623/pseudoregalia-multiplayer/releases) page. This just contains the mod files for the mod.
-2. Extract the zip directly into the `Pseudoregalia` folder. If you did it correctly, you should see a file in this location: `Pseudoregalia/pseudoregalia/Content/Paks/LogicMods/PseudoregaliaMultiplayerMod.pak`.
-3. Open `Pseudoregalia/pseudoregalia/Binaries/Win64/Mods/mods.txt` and add a new line with this text:
+
+1. Extract the zip directly into the `Pseudoregalia` folder. If you did it correctly, you should see a file in this location: `Pseudoregalia/pseudoregalia/Content/Paks/LogicMods/PseudoregaliaMultiplayerMod.pak`.
+
+1. Open `Pseudoregalia/pseudoregalia/Binaries/Win64/Mods/mods.txt` and add a new line with this text:
 
    ```
    PseudoregaliaMultiplayerMod : 1
@@ -29,18 +31,26 @@ If you have `pseudoregalia-archipelago` installed, then you already have the ver
 `pseudoregalia-multiplayer` was built for a specific, older version of UE4SS, so it might not be compatible with the version you have installed. The safest way to make sure the mod will work is to create a new folder and install the mod fresh.
 
 1. Go to Steam, right click the Pseudoregalia game, and navigate to Manage > Browse local files. This will put you *into* the `Pseudoregalia` folder.
-2. Navigate up one level, then make a copy of the `Pseudoregalia` folder. This will be your original install that still has all your current mods, so it can be helpful to name it something to reflect that.
-3. Uninstall Pseudoregalia on Steam. This will clear all the vanilla files out of the `Pseudoregalia` folder, leaving only the modded files.
-4. Delete the `Pseudoregalia` folder.
-5. Reinstall Pseudoregalia. The `Pseudoregalia` folder now only contains a completely fresh, vanilla version of the game.
+
+1. Navigate up one level, then make a copy of the `Pseudoregalia` folder. This will be your original install that still has all your current mods, so it can be helpful to name it something to reflect that.
+
+1. Uninstall Pseudoregalia on Steam. This will clear all the vanilla files out of the `Pseudoregalia` folder, leaving only the modded files.
+
+1. Delete the `Pseudoregalia` folder.
+
+1. Reinstall Pseudoregalia. The `Pseudoregalia` folder now only contains a completely fresh, vanilla version of the game.
 
 ## Installing Fresh
 
 1. [Optional] It's recommended that you copy your `Pseudoregalia` folder before you install. This is because UE4SS comes with a lot of files, and if you don't want it anymore, cleaning it up manually can be a hassle. You can choose to install the mod into either folder.
+
     1. Go to Steam, right click the Pseudoregalia game, and navigate to Manage > Browse local files. This will put you *into* the `Pseudoregalia` folder.
-    2. Navigate up one level, then make a copy of the `Pseudoregalia` folder.
-2. Download `pseudoregalia-multiplayer-ue4ss.zip` from the [Releases](https://github.com/highrow623/pseudoregalia-multiplayer/releases) page. This contains the mod files for the mod as well as a compatible version of UE4SS bundled together.
-3. Extract the zip directly into the `Pseudoregalia` folder. If you did it correctly, you should see a file in this location: `Pseudoregalia/pseudoregalia/Content/Paks/LogicMods/PseudoregaliaMultiplayerMod.pak`.
+
+    1. Navigate up one level, then make a copy of the `Pseudoregalia` folder.
+
+1. Download `pseudoregalia-multiplayer-ue4ss.zip` from the [Releases](https://github.com/highrow623/pseudoregalia-multiplayer/releases) page. This contains the mod files for the mod as well as a compatible version of UE4SS bundled together.
+
+1. Extract the zip directly into the `Pseudoregalia` folder. If you did it correctly, you should see a file in this location: `Pseudoregalia/pseudoregalia/Content/Paks/LogicMods/PseudoregaliaMultiplayerMod.pak`.
 
 ## Configuring the Client
 
@@ -60,6 +70,7 @@ The settings file is only read when you start Pseudoregalia. If you need to chan
 If you want to turn off the mod without removing UE4SS, do the following:
 
 1. Remove `Pseudoregalia/pseudoregalia/Content/Paks/LogicMods/PseudoregaliaMultiplayerMod.pak`. You may want to copy it to another location in case you want to reinstall later.
-2. Open `Pseudoregalia/pseudoregalia/Binaries/Win64/Mods/mods.txt` and change the number in the line with `PseudoregaliaMultiplayerMod` from `1` to `0`.
+
+1. Open `Pseudoregalia/pseudoregalia/Binaries/Win64/Mods/mods.txt` and change the number in the line with `PseudoregaliaMultiplayerMod` from `1` to `0`.
 
 To uninstall the mod and UE4SS, see the [cleaning up UE4SS](#cleaning-up-ue4ss) section. If you copied the `Pseudoregalia` folder specifically for this mod, you can just delete the folder.
