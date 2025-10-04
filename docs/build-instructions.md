@@ -18,13 +18,13 @@ To build the `.pak` file for the BP mod, I just cook the assets from the editor 
 
 1. Clone the repo recursively:
 
-    ```
+    ```console
     > git clone https://github.com/highrow623/pseudoregalia-multiplayer.git --recursive
     ```
 
     If you already cloned the repo without the `--recursive` tag, you should be able to run this inside the repo:
 
-    ```
+    ```console
     pseudoregalia-multiplayer> git submodule update --init --recursive
     ```
 
@@ -36,7 +36,7 @@ To build the `.pak` file for the BP mod, I just cook the assets from the editor 
 
 1. Navigate inside the repo and build the project with CMake:
 
-    ```
+    ```console
     pseudoregalia-multiplayer> cmake -S . -B Output
     ```
 
@@ -48,7 +48,7 @@ To build the `.pak` file for the BP mod, I just cook the assets from the editor 
 
 1. Build with MSBuild:
 
-    ```
+    ```console
     PseudoregaliaMultiplayerMod> msbuild PseudoregaliaMultiplayerMod.sln -p:Configuration=Game__Shipping__Win64 -p:Platform=x64
     ```
 
@@ -58,18 +58,18 @@ To build the `.pak` file for the BP mod, I just cook the assets from the editor 
 
 The server is written in Rust, so just building a Rust executable like normal is all you need:
 
-```
+```console
 server> cargo build --release
 ```
 
 This will output the executable to `server/target/release`. To run the server with cargo, use
 
-```
+```console
 server> cargo run --release
 ```
 
 If you need to provide an address override, you can pass arguments to the server like this:
 
-```
+```console
 server> cargo run --release -- 0.0.0.0:23432
 ```
