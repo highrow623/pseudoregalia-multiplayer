@@ -25,7 +25,7 @@ To build the `.pak` file for the BP mod, I just cook the assets from the editor 
     If you already cloned the repo without the `--recursive` tag, you should be able to run this inside the repo:
 
     ```
-    > git submodule update --init --recursive
+    pseudoregalia-multiplayer> git submodule update --init --recursive
     ```
 
 1. Open `client/RE-UE4SS/deps/third/CMakeLists.txt` and change the `GIT_TAG` for `ImGuiTextEdit` on line 29 from `master` to `v1.1.0`.
@@ -37,7 +37,7 @@ To build the `.pak` file for the BP mod, I just cook the assets from the editor 
 1. Navigate inside the repo and build the project with CMake:
 
     ```
-    > cmake -S . -B Output
+    pseudoregalia-multiplayer> cmake -S . -B Output
     ```
 
     The solution file will be built to `client/Output/client.sln`. You can open the solution in Visual Studio to make edits, but you will build with the build tools.
@@ -49,7 +49,7 @@ To build the `.pak` file for the BP mod, I just cook the assets from the editor 
 1. Build with MSBuild:
 
     ```
-    > msbuild PseudoregaliaMultiplayerMod.sln -p:Configuration=Game__Shipping__Win64 -p:Platform=x64
+    PseudoregaliaMultiplayerMod> msbuild PseudoregaliaMultiplayerMod.sln -p:Configuration=Game__Shipping__Win64 -p:Platform=x64
     ```
 
     PseudoregaliaMultiplayerMod.dll will be written to `client/Output/PseudoregaliaMultiplayerMod/Game__Shipping__Win64`. Rename the file to `main.dll` and replace `pseudoregalia/Binaries/Win64/Mods/PseudoregaliaMultiplayerMod/dlls/main.dll` in your Pseudoregalia game to use/test it.
@@ -59,17 +59,17 @@ To build the `.pak` file for the BP mod, I just cook the assets from the editor 
 The server is written in Rust, so just building a Rust executable like normal is all you need:
 
 ```
-cargo build --release
+server> cargo build --release
 ```
 
 This will output the executable to `server/target/release`. To run the server with cargo, use
 
 ```
-cargo run --release
+server> cargo run --release
 ```
 
 If you need to provide an address override, you can pass arguments to the server like this:
 
 ```
-cargo run --release -- 0.0.0.0:23432
+server> cargo run --release -- 0.0.0.0:23432
 ```
