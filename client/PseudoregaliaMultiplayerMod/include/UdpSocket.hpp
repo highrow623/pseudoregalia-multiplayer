@@ -4,8 +4,6 @@
 #include <boost/array.hpp>
 #include <boost/bind.hpp>
 
-#include "Settings.hpp"
-
 namespace UdpSocket
 {
     using boost::asio::ip::udp;
