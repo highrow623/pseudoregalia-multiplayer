@@ -16,7 +16,7 @@ If you want to uninstall, check out the [uninstalling the mod](#uninstalling-the
 
 If you have `pseudoregalia-archipelago` installed, then you already have the version of UE4SS that this mod is compatible with.
 
-1. Download `pseudoregalia-multiplayer.zip` from the [Releases](todo) page. This just contains the mod files for the mod.
+1. Download `pseudoregalia-multiplayer.zip` from the [Releases](https://github.com/highrow623/pseudoregalia-multiplayer/releases) page. This just contains the mod files for the mod.
 2. Extract the zip directly into the `Pseudoregalia` folder. If you did it correctly, you should see a file in this location: `Pseudoregalia/pseudoregalia/Content/Paks/LogicMods/PseudoregaliaMultiplayerMod.pak`.
 3. Open `Pseudoregalia/pseudoregalia/Binaries/Win64/Mods/mods.txt` and add a new line with this text:
 
@@ -39,7 +39,7 @@ If you have `pseudoregalia-archipelago` installed, then you already have the ver
 1. [Optional] It's recommended that you copy your `Pseudoregalia` folder before you install. This is because UE4SS comes with a lot of files, and if you don't want it anymore, cleaning it up manually can be a hassle. You can choose to install the mod into either folder.
     1. Go to Steam, right click the Pseudoregalia game, and navigate to Manage > Browse local files. This will put you *into* the `Pseudoregalia` folder.
     2. Navigate up one level, then make a copy of the `Pseudoregalia` folder.
-2. Download `pseudoregalia-multiplayer-ue4ss.zip` from the [Releases](todo) page. This contains the mod files for the mod as well as a compatible version of UE4SS bundled together.
+2. Download `pseudoregalia-multiplayer-ue4ss.zip` from the [Releases](https://github.com/highrow623/pseudoregalia-multiplayer/releases) page. This contains the mod files for the mod as well as a compatible version of UE4SS bundled together.
 3. Extract the zip directly into the `Pseudoregalia` folder. If you did it correctly, you should see a file in this location: `Pseudoregalia/pseudoregalia/Content/Paks/LogicMods/PseudoregaliaMultiplayerMod.pak`.
 
 ## Configuring the Client

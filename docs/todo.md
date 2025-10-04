@@ -6,7 +6,6 @@
 * finish writing docs
   * running the server
   * c++ mod section of build instructions
-  * links to releases page in installing the mod and readme
 * add license
 * make the repo public
 
