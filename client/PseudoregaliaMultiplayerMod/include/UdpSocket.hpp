@@ -9,7 +9,6 @@
 namespace UdpSocket
 {
     using boost::asio::ip::udp;
-    using boost::asio::ip::address;
 
     // A simple wrapper around boost udp sockets with a similar interface to wswrap
     template<size_t SEND, size_t RECV>
@@ -21,8 +20,9 @@ namespace UdpSocket
         typedef std::function<void(const boost::array<uint8_t, RECV>&, size_t)> on_recv_handler;
         typedef std::function<void(const std::string&)> on_err_handler;
 
-        UdpSocket(const std::string& address, const uint16_t& port, on_recv_handler on_recv, on_err_handler on_err)
-            : _socket(_io_service), _endpoint(address::from_string(address), port), _on_recv(on_recv), _on_err(on_err)
+        UdpSocket(const std::string& address, const std::string& port, on_recv_handler on_recv, on_err_handler on_err)
+            : _socket(_io_service), _resolver(_io_service), _endpoint(*_resolver.resolve({ udp::v4(), address, port }))
+            , _on_recv(on_recv), _on_err(on_err)
         {
             _socket.open(udp::v4());
         }
@@ -46,6 +46,7 @@ namespace UdpSocket
     private:
         boost::asio::io_service _io_service;
         udp::socket _socket;
+        udp::resolver _resolver;
         udp::endpoint _endpoint;
         udp::endpoint _sender_endpoint;
         boost::array<uint8_t, RECV> _recv_buf{};

@@ -22,7 +22,7 @@ namespace
     const std::string settings_filename2 = "pseudoregalia/Binaries/Win64/" + settings_filename1;
 
     std::string address = "127.0.0.1";
-    uint16_t port = 8080;
+    std::string port = "23432";
 }
 
 void Settings::Load()
@@ -59,7 +59,7 @@ const std::string& Settings::GetAddress()
     return address;
 }
 
-const uint16_t& Settings::GetPort()
+const std::string& Settings::GetPort()
 {
     return port;
 }
@@ -77,19 +77,6 @@ void ParseSetting(std::string& setting, toml::table settings_table, const std::s
     }
 
     Log(ToWide(setting_path + " = \"" + *option + "\""));
-    setting = *option;
-}
-
-void ParseSetting(uint16_t& setting, toml::table settings_table, const std::string& setting_path)
-{
-    std::optional<uint16_t> option = settings_table.at_path(setting_path).value<uint16_t>();
-    if (!option)
-    {
-        Log(ToWide(setting_path) + L" = default (setting missing or not a number)");
-        return;
-    }
-
-    Log(ToWide(setting_path + " = " + std::to_string(*option)));
     setting = *option;
 }
 

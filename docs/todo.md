@@ -2,7 +2,6 @@
 
 ## For initial release
 
-* use resolver for udp socket to accept domains
 * make a release
 * finish writing docs
   * running the server

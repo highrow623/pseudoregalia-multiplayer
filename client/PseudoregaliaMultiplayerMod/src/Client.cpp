@@ -252,10 +252,15 @@ void Client::Tick()
         {
             const auto& address = Settings::GetAddress();
             const auto& port = Settings::GetPort();
-            auto uri = "ws://" + address + ":" + std::to_string(port);
+            auto uri = "ws://" + address + ":" + port;
             try
             {
                 ws = new wswrap::WS(uri, OnOpen, OnClose, OnMessage, OnError);
+            }
+            catch (const boost::system::system_error& ex)
+            {
+                ws = nullptr;
+                Log(L"Error creating WebSocket: " + ToWide(ex.code().message()), LogType::Error);
             }
             catch (const std::exception& ex)
             {
@@ -265,6 +270,13 @@ void Client::Tick()
             try
             {
                 udp = new UdpSocket::UdpSocket<SEND, RECV>(address, port, OnRecv, OnErr);
+            }
+            catch (const boost::system::system_error& ex)
+            {
+                delete ws;
+                ws = nullptr;
+                udp = nullptr;
+                Log(L"Error creating UDP socket: " + ToWide(ex.code().message()), LogType::Error);
             }
             catch (const std::exception& ex)
             {

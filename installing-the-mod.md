@@ -51,7 +51,7 @@ The settings file has these options:
 | Option | Type | Description |
 | --- | --- | --- |
 | `address` | string | The address of the server to connect to. Can be an IP address or a domain. |
-| `port` | number | The port number the server is running on. |
+| `port` | string | The port number the server is running on. |
 
 The settings file is only read when you start Pseudoregalia. If you need to change them, you'll need to quit out and restart the game for the new settings to take effect.
 
