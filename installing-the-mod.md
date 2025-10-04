@@ -69,8 +69,8 @@ The settings file is only read when you start Pseudoregalia. If you need to chan
 
 If you want to turn off the mod without removing UE4SS, do the following:
 
-1. Remove `Pseudoregalia/pseudoregalia/Content/Paks/LogicMods/PseudoregaliaMultiplayerMod.pak`. You may want to copy it to another location in case you want to reinstall later.
+1. Remove `Pseudoregalia/pseudoregalia/Content/Paks/LogicMods/PseudoregaliaMultiplayerMod.pak`. You may want to copy it to another location in case you decide to reinstall later.
 
-1. Open `Pseudoregalia/pseudoregalia/Binaries/Win64/Mods/mods.txt` and change the number in the line with `PseudoregaliaMultiplayerMod` from `1` to `0`.
+1. Open `Pseudoregalia/pseudoregalia/Binaries/Win64/Mods/mods.txt` and change the number after `PseudoregaliaMultiplayerMod` from `1` to `0`.
 
 To uninstall the mod and UE4SS, see the [cleaning up UE4SS](#cleaning-up-ue4ss) section. If you copied the `Pseudoregalia` folder specifically for this mod, you can just delete the folder.
