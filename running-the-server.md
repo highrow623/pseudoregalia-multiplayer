@@ -6,7 +6,7 @@ This guide will walk you through getting the server running on an AWS EC2 instan
 
 ### Create Security Group
 
-The security group defines network rules and acts as a firewall for you instance. You only need to create one security group; all your instances will use the same one.
+The security group defines network rules and acts as a firewall for your instance. You only need to create one security group; all your instances will use the same one.
 
 1. In the EC2 service, click Security Groups in the sidebar on the left.
 1. Click Create security group. Give it whatever name and description you like.
