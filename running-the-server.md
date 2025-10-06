@@ -35,7 +35,7 @@ Now that the instance is running, we're ready to connect to it and run the serve
 1. Connect to the instance with SSH. You can see more instructions and an example command by clicking Connect on the instance summary page and going to the SSH client tab.
 1. Download the server by running the following command: `wget https://github.com/highrow623/pseudoregalia-multiplayer/releases/download/v0.1.0/pm-server-x86_64-unknown-linux-gnu`.
 1. Add execute permissions to the server with the following command: `chmod +x pm-server-x86_64-unknown-linux-gnu`.
-1. Run the server. For example, if you choose the port 23432 the run the server on, run the following command: `./pm-server-x86_64-unknown-linux-gnu 0.0.0.0:23432`.
+1. Run the server. For example, if you chose port 23432 to run the server on, run the following command: `./pm-server-x86_64-unknown-linux-gnu 0.0.0.0:23432`.
 
 And now the server is up and running! The instance summary page has a Public IPv4 address and a Public DNS, either of which can be used in `settings.toml` for the `server.address` field.
 
