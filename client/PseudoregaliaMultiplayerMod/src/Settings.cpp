@@ -13,7 +13,7 @@
 namespace
 {
     void ParseSetting(std::string&, toml::table, const std::string&);
-    void ParseSetting(uint16_t&, toml::table, const std::string&);
+    void ParseSetting(std::array<uint8_t, 3>&, toml::table, const std::string&);
     std::wstring ToWide(const std::string&);
 
     // if you run from the executable directory
@@ -23,6 +23,7 @@ namespace
 
     std::string address = "127.0.0.1";
     std::string port = "23432";
+    std::array<uint8_t, 3> color = { 0x00, 0x7f, 0xff };
 }
 
 void Settings::Load()
@@ -52,6 +53,7 @@ void Settings::Load()
     Log(L"Loading settings", LogType::Loud);
     ParseSetting(address, settings_table, "server.address");
     ParseSetting(port, settings_table, "server.port");
+    ParseSetting(color, settings_table, "sybil.color");
 }
 
 const std::string& Settings::GetAddress()
@@ -62,6 +64,11 @@ const std::string& Settings::GetAddress()
 const std::string& Settings::GetPort()
 {
     return port;
+}
+
+const std::array<uint8_t, 3>& Settings::GetColor()
+{
+    return color;
 }
 
 namespace
@@ -78,6 +85,42 @@ void ParseSetting(std::string& setting, toml::table settings_table, const std::s
 
     Log(ToWide(setting_path + " = \"" + *option + "\""));
     setting = *option;
+}
+
+// parses the setting as an rgb hex code
+void ParseSetting(std::array<uint8_t, 3>& setting, toml::table settings_table, const std::string& setting_path)
+{
+    std::optional<std::string> option = settings_table.at_path(setting_path).value<std::string>();
+    if (!option)
+    {
+        Log(ToWide(setting_path) + L" = default (setting missing or not a string)");
+        return;
+    }
+
+    if (option->size() != 6)
+    {
+        Log(ToWide(setting_path) + L" = default (ill-formed hex code)");
+        return;
+    }
+
+    uint8_t red;
+    uint8_t green;
+    uint8_t blue;
+
+    try
+    {
+        red = uint8_t(std::stoi(option->substr(0, 2), nullptr, 16));
+        green = uint8_t(std::stoi(option->substr(2, 2), nullptr, 16));
+        blue = uint8_t(std::stoi(option->substr(4, 2), nullptr, 16));
+    }
+    catch (const std::invalid_argument&)
+    {
+        Log(ToWide(setting_path) + L" = default (ill-formed hex code)");
+        return;
+    }
+
+    Log(ToWide(setting_path + " = #" + *option));
+    setting = { red, green, blue };
 }
 
 std::wstring ToWide(const std::string& input)

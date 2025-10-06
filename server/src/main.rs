@@ -6,6 +6,7 @@ use std::{
 };
 use tokio::net::{TcpListener, UdpSocket};
 
+mod message;
 mod serve;
 mod state;
 

@@ -1,3 +1,4 @@
+use crate::message::{PlayerInfo, ServerMessage};
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -26,19 +27,15 @@ impl PlayerState {
     }
 }
 
-pub enum ConnectionUpdate {
-    Connected(u8),
-    Disconnected(u8),
-}
-
 struct Player {
+    color: [u8; 3],
     states: BTreeMap<u32, PlayerState>,
-    tx: UnboundedSender<ConnectionUpdate>,
+    tx: UnboundedSender<ServerMessage>,
 }
 
 impl Player {
-    fn new(tx: UnboundedSender<ConnectionUpdate>) -> Self {
-        Self { states: BTreeMap::new(), tx }
+    fn new(color: [u8; 3], tx: UnboundedSender<ServerMessage>) -> Self {
+        Self { color, states: BTreeMap::new(), tx }
     }
 
     fn update(&mut self, millis: u32, player_state: PlayerState) {
@@ -73,7 +70,10 @@ impl State {
         Self { players: HashMap::new(), rng: SmallRng::from_rng(&mut rand::rng()) }
     }
 
-    pub fn connect(&mut self) -> Option<(u8, UnboundedReceiver<ConnectionUpdate>, Vec<u8>)> {
+    pub fn connect(
+        &mut self,
+        color: [u8; 3],
+    ) -> Option<(u8, UnboundedReceiver<ServerMessage>, Vec<PlayerInfo>)> {
         if self.players.len() == MAX_PLAYERS {
             return None;
         }
@@ -89,14 +89,14 @@ impl State {
         // create list of other players' ids while informing other players of this new connection
         let mut players = Vec::with_capacity(self.players.len());
         for (player_id, player) in &self.players {
-            players.push(*player_id);
+            players.push(PlayerInfo { id: *player_id, color: player.color });
             // if the corresponding rx has been dropped, it doesn't matter that this message won't
             // get read, so we can ignore the error
-            let _ = player.tx.send(ConnectionUpdate::Connected(id));
+            let _ = player.tx.send(ServerMessage::PlayerJoined { id, color });
         }
 
         let (tx, rx) = mpsc::unbounded_channel();
-        self.players.insert(id, Player::new(tx));
+        self.players.insert(id, Player::new(color, tx));
 
         Some((id, rx, players))
     }
@@ -110,7 +110,7 @@ impl State {
         }
 
         for player in self.players.values() {
-            let _ = player.tx.send(ConnectionUpdate::Disconnected(id));
+            let _ = player.tx.send(ServerMessage::PlayerLeft { id });
         }
     }
 

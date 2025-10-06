@@ -13,9 +13,9 @@ All messages are in JSON format, with a `type` field to indicate its purpose, as
   "type": "Connected",
   "id": 11,
   "players": [
-    57,
-    84,
-    38
+    { "id": 57, "color": [0, 127, 255] },
+    { "id": 84, "color": [255, 0, 255] },
+    { "id": 38, "color": [255, 0, 0] }
   ]
 }
 ```
@@ -24,7 +24,11 @@ All messages are in JSON format, with a `type` field to indicate its purpose, as
 
 ### `Connect`
 
-The `Connect` message is sent after the WebSocket connection is established. This message has no additional fields, but may be updated in the future to validate the connection with a password or set a name for the player.
+The `Connect` message is sent after the WebSocket connection is established.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `color` | array of three unsigned 8-bit integers | The RGB color your ghost will appear as to other players |
 
 ## Server to Client Messages
 
@@ -35,7 +39,14 @@ The `Connected` message is sent in response to the `Connect` message to signal a
 | Field | Type | Description |
 | --- | --- | --- |
 | `id` | unsigned 8-bit integer | The id assigned to the player |
-| `players` | array of unsigned 8-bit integers | The ids of all other currently connected players |
+| `players` | array of `PlayerInfo` objects | The info of all other currently connected players |
+
+#### `PlayerInfo` object
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | unsigned 8-bit integer | The id assigned to this player |
+| `color` | array of three unsigned 8-bit integers | The RGB color the player has chosen for their ghost |
 
 ### `PlayerJoined`
 
@@ -44,6 +55,7 @@ The `PlayerJoined` message is sent when a new player connects to the server.
 | Field | Type | Description |
 | --- | --- | --- |
 | `id` | unsigned 8-bit integer | The id of the player that just joined |
+| `color` | array of three unsigned 8-bit integers | The RGB color the player has chosen for their ghost |
 
 ### `PlayerLeft`
 

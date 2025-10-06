@@ -1,3 +1,12 @@
+# Rename this file to settings.toml for the settings to actually be used. Settings are only read
+# when you start Pseudoregalia, so changes require a restart to take effect.
+
+# The info of the server to connect to. Connection happens automatically when you load into a file.
 [server]
 address = "127.0.0.1"
 port = "23432"
+
+[sybil]
+
+# RGB hex code; the color your ghost will appear to other players.
+color = "007fff"

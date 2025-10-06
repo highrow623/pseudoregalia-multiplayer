@@ -81,6 +81,7 @@ namespace
     struct Ghost
     {
         uint8_t id = 0;
+        std::array<uint8_t, 3> color{};
         std::list<State> states;
 
         // offsets provide a way to figure out syncing. the offset is meant to guess at how far off a player's
@@ -116,6 +117,9 @@ namespace
             }
 
             s.info.id = id;
+            s.info.red = color[0];
+            s.info.green = color[1];
+            s.info.blue = color[2];
 
             // insert after the first element that has a lower millis to keep the list sorted
             // reverse find because we're more likely to be inserting towards the back of the list
@@ -186,6 +190,9 @@ namespace
                     .rotation_y = lower_is_closer ? lower.info.rotation_y : upper.info.rotation_y,
                     .rotation_z = lower_is_closer ? lower.info.rotation_z : upper.info.rotation_z,
                     .id = id,
+                    .red = color[0],
+                    .green = color[1],
+                    .blue = color[2],
                 },
                 .zone = lower.zone,
                 .millis = ghost_millis,
@@ -370,8 +377,10 @@ namespace
 void OnOpen()
 {
     Log(L"WebSocket connection established", LogType::Loud);
+    const auto& color = Settings::GetColor();
     nlohmann::json j = {
         {"type", "Connect"},
+        {"color", color},
     };
     ws->send_text(j.dump());
 }
@@ -384,88 +393,31 @@ void OnClose()
 
 void OnMessage(const std::string& message)
 {
-    // set this here in case we return early
-    queue_disconnect = true;
-
+    // TODO add schema validation? this function assumes a valid message
     nlohmann::json j = nlohmann::json::parse(message);
-    if (!j.is_object())
-    {
-        Log(L"Received non-object message: " + ToWide(message), LogType::Warning);
-        return;
-    }
-
-    if (!j.contains("type"))
-    {
-        Log(L"Received message with no type field: " + ToWide(message), LogType::Warning);
-        return;
-    }
-
-    auto& field_type = j["type"];
-    if (!field_type.is_string())
-    {
-        Log(L"Received message with non-string type field: " + ToWide(message), LogType::Warning);
-        return;
-    }
-
+    const auto& field_type = j["type"];
     if (field_type == "Connected")
     {
         if (id)
         {
             Log(L"Received Connected message after connection was already established", LogType::Warning);
+            queue_disconnect = true;
             return;
         }
 
-        if (!j.contains("id"))
-        {
-            Log(L"Received Connected message with no id field: " + ToWide(message), LogType::Warning);
-            return;
-        }
-
-        auto& field_id = j["id"];
-        if (!field_id.is_number_unsigned())
-        {
-            Log(L"Received Connected message with invalid id field: " + ToWide(message), LogType::Warning);
-            return;
-        }
-
-        auto long_id = field_id.template get<uint64_t>();
-        if (long_id > 0xFF)
-        {
-            Log(L"Received Connected message with out-of-range id field: " + ToWide(message), LogType::Warning);
-            return;
-        }
-        id = uint8_t(long_id);
-
-        if (!j.contains("players"))
-        {
-            Log(L"Received Connected message with no players field: " + ToWide(message), LogType::Warning);
-            return;
-        }
+        id = j["id"].template get<uint8_t>();
 
         auto& field_players = j["players"];
-        if (!field_players.is_array())
-        {
-            Log(L"Received Connected message with non-array players field: " + ToWide(message), LogType::Warning);
-            return;
-        }
-
         for (auto it = field_players.begin(); it != field_players.end(); ++it)
         {
-            if (!it->is_number_unsigned())
-            {
-                Log(L"Received Connected message with invalid player id: " + ToWide(message), LogType::Warning);
-                return;
-            }
+            auto player_id = (*it)["id"].template get<uint8_t>();
 
-            auto long_player_id = it->template get<uint64_t>();
-            if (long_player_id > 0xFF)
-            {
-                Log(L"Received Connected message with out-of-range player id: " + ToWide(message), LogType::Warning);
-                return;
-            }
+            const auto& field_color = (*it)["color"];
+            auto red = field_color[0].template get<uint8_t>();
+            auto green = field_color[1].template get<uint8_t>();
+            auto blue = field_color[2].template get<uint8_t>();
 
-            auto player_id = uint8_t(long_player_id);
-            ghosts[player_id] = Ghost{ .id = player_id };
+            ghosts[player_id] = Ghost{ .id = player_id, .color = { red, green, blue } };
         }
  
         Log(L"Received Connected message with player id " + std::to_wstring(*id), LogType::Loud);
@@ -475,31 +427,19 @@ void OnMessage(const std::string& message)
         if (!id)
         {
             Log(L"Received PlayerJoined message before Connected message", LogType::Warning);
+            queue_disconnect = true;
             return;
         }
 
-        if (!j.contains("id"))
-        {
-            Log(L"Received PlayerJoined message with no id field: " + ToWide(message), LogType::Warning);
-            return;
-        }
+        auto player_id = j["id"].template get<uint8_t>();
 
-        auto& field_id = j["id"];
-        if (!field_id.is_number_unsigned())
-        {
-            Log(L"Received PlayerJoined message with invalid id field: " + ToWide(message), LogType::Warning);
-            return;
-        }
+        const auto& field_color = j["color"];
+        auto red = field_color[0].template get<uint8_t>();
+        auto green = field_color[1].template get<uint8_t>();
+        auto blue = field_color[2].template get<uint8_t>();
 
-        auto long_player_id = field_id.template get<uint64_t>();
-        if (long_player_id > 0xFF)
-        {
-            Log(L"Received PlayerJoined message with out-of-range id field: " + ToWide(message), LogType::Warning);
-            return;
-        }
+        ghosts[player_id] = Ghost{ .id = player_id, .color = { red, green, blue } };
 
-        auto player_id = uint8_t(long_player_id);
-        ghosts[player_id] = Ghost{ .id = player_id };
         Log(L"Received PlayerJoined message with id " + std::to_wstring(player_id), LogType::Loud);
     }
     else if (field_type == "PlayerLeft")
@@ -507,40 +447,15 @@ void OnMessage(const std::string& message)
         if (!id)
         {
             Log(L"Received PlayerLeft message before Connected message", LogType::Warning);
+            queue_disconnect = true;
             return;
         }
 
-        if (!j.contains("id"))
-        {
-            Log(L"Received PlayerLeft message with no id field: " + ToWide(message), LogType::Warning);
-            return;
-        }
-
-        auto& field_id = j["id"];
-        if (!field_id.is_number_unsigned())
-        {
-            Log(L"Received PlayerLeft message with invalid id field: " + ToWide(message), LogType::Warning);
-            return;
-        }
-
-        auto long_player_id = field_id.template get<uint64_t>();
-        if (long_player_id > 0xFF)
-        {
-            Log(L"Received PlayerLeft message with out-of-range id field: " + ToWide(message), LogType::Warning);
-            return;
-        }
-
-        auto player_id = uint8_t(long_player_id);
+        auto player_id = j["id"].template get<uint8_t>();
         ghosts.erase(player_id);
+
         Log(L"Received PlayerLeft message with id " + std::to_wstring(player_id), LogType::Loud);
     }
-    else
-    {
-        Log(L"Received message with unknown type: " + ToWide(field_type), LogType::Warning);
-        return;
-    }
-
-    queue_disconnect = false;
 }
 
 void OnError(const std::string& error_message)
@@ -598,6 +513,7 @@ void OnRecv(const boost::array<uint8_t, RECV>& buf, size_t len)
 void OnErr(const std::string& error_message)
 {
     Log(L"UDP error: " + ToWide(error_message), LogType::Error);
+    // TODO should we disconnect here?
 }
 
 std::wstring ToWide(const std::string& input)

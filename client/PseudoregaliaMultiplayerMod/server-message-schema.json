@@ -7,6 +7,21 @@
       "minimum": 0,
       "exclusiveMaximum": 256
     },
+    "color": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/u8" },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "playerInfo": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/u8" },
+        "color": { "$ref": "#/$defs/color" }
+      },
+      "required": ["id", "color"],
+      "additionalProperties": false
+    },
     "message": {
       "connected": {
         "properties": {
@@ -14,13 +29,22 @@
           "id": { "$ref": "#/$defs/u8" },
           "players": {
             "type": "array",
-            "items": { "$ref": "#/$defs/u8" }
+            "items": { "$ref": "#/$defs/playerInfo" }
           }
         },
         "required": ["id", "players"],
         "additionalProperties": false
       },
-      "playerJoinedOrLeft": {
+      "playerJoined": {
+        "properties": {
+          "type": {},
+          "id": { "$ref": "#/$defs/u8" },
+          "color": { "$ref": "#/$defs/color" }
+        },
+        "required": ["id", "color"],
+        "additionalProperties": false
+      },
+      "playerLeft": {
         "properties": {
           "type": {},
           "id": { "$ref": "#/$defs/u8" }
@@ -48,11 +72,11 @@
     },
     {
       "if": { "properties": { "type": { "const": "PlayerJoined" } } },
-      "then": { "$ref": "#/$defs/message/playerJoinedOrLeft" }
+      "then": { "$ref": "#/$defs/message/playerJoined" }
     },
     {
       "if": { "properties": { "type": { "const": "PlayerLeft" } } },
-      "then": { "$ref": "#/$defs/message/playerJoinedOrLeft" }
+      "then": { "$ref": "#/$defs/message/playerLeft" }
     }
   ]
 }

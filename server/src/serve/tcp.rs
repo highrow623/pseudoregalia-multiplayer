@@ -1,28 +1,16 @@
-use crate::state::{ConnectionUpdate, State};
+use crate::{
+    message::{ClientMessage, ServerMessage},
+    state::State,
+};
 use futures_util::{SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tokio::{net::TcpStream, sync::mpsc::UnboundedReceiver};
 use tokio_tungstenite::WebSocketStream;
 
-#[derive(Serialize)]
-#[serde(tag = "type")]
-enum ServerMessage {
-    Connected { id: u8, players: Vec<u8> },
-    PlayerJoined { id: u8 },
-    PlayerLeft { id: u8 },
-}
-
-#[derive(Deserialize)]
-#[serde(tag = "type")]
-enum ClientMessage {
-    Connect,
-}
-
 struct Connection {
     ws_stream: WebSocketStream<TcpStream>,
     id: u8,
-    rx: UnboundedReceiver<ConnectionUpdate>,
+    rx: UnboundedReceiver<ServerMessage>,
     state: Arc<Mutex<State>>,
 }
 
@@ -80,10 +68,10 @@ async fn receive_connection(
     let mut ws_stream = tokio_tungstenite::accept_async(raw_stream)
         .await
         .map_err(|e| format!("error during WebSocket handshake occured: {e}"))?;
-    receive_connect_message(&mut ws_stream)
+    let color = receive_connect_message(&mut ws_stream)
         .await
         .map_err(|e| format!("failed to receive connect message: {e}"))?;
-    let (id, rx, players) = state.lock().unwrap().connect().ok_or("server full".to_owned())?;
+    let (id, rx, players) = state.lock().unwrap().connect(color).ok_or("server full".to_owned())?;
     let mut connection = Connection { ws_stream, id, rx, state };
 
     let msg = ServerMessage::Connected { id, players };
@@ -96,7 +84,9 @@ async fn receive_connection(
     Ok(connection)
 }
 
-async fn receive_connect_message(ws_stream: &mut WebSocketStream<TcpStream>) -> Result<(), String> {
+async fn receive_connect_message(
+    ws_stream: &mut WebSocketStream<TcpStream>,
+) -> Result<[u8; 3], String> {
     loop {
         // Validate message
         let Some(msg) = ws_stream.next().await else {
@@ -112,20 +102,18 @@ async fn receive_connect_message(ws_stream: &mut WebSocketStream<TcpStream>) -> 
 
         // Parse message
         let msg = msg.to_text().map_err(|e| format!("failed to cast message to text: {e}"))?;
-        // Currently, the only valid client message is Connect, which has no fields, so we only care
-        // if deserialization is successful.
-        // TODO if more client message types get added or the Connect message gets fields added to
-        // it, msg will have to actually be used.
-        let _msg = serde_json::from_str::<ClientMessage>(msg)
+        let msg = serde_json::from_str::<ClientMessage>(msg)
             .map_err(|e| format!("failed to deserialize message: {e}"))?;
 
-        return Ok(());
+        return match msg {
+            ClientMessage::Connect { color } => Ok(color),
+        };
     }
 }
 
 async fn send_updates(
     ws_stream: &mut WebSocketStream<TcpStream>,
-    buf: &mut Vec<ConnectionUpdate>,
+    buf: &mut Vec<ServerMessage>,
 ) -> Result<(), String> {
     if buf.is_empty() {
         // I don't think this should ever happen because rx is only dropped when we disconnect
@@ -139,12 +127,8 @@ async fn send_updates(
 
 async fn feed_connection_update(
     ws_stream: &mut WebSocketStream<TcpStream>,
-    connection_update: ConnectionUpdate,
+    msg: ServerMessage,
 ) -> Result<(), String> {
-    let msg = match connection_update {
-        ConnectionUpdate::Connected(id) => ServerMessage::PlayerJoined { id },
-        ConnectionUpdate::Disconnected(id) => ServerMessage::PlayerLeft { id },
-    };
     let msg = serde_json::to_string(&msg).unwrap();
     ws_stream.feed(msg.into()).await.map_err(|e| format!("failed to feed connection update: {e}"))
 }
