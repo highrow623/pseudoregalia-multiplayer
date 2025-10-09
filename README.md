@@ -6,4 +6,6 @@ Currently, all the mod does is sync player transforms (location/rotation), so yo
 
 The mod uses UE4SS and was built to be compatible with [`pseudoregalia-archipelago`](https://github.com/qwint/pseudoregalia-archipelago). This mod is independent though; you don't need to use `pseudoregalia-archipelago` to use this mod. Note that this mod may not be compatible with other UE4SS mods because of the version of UE4SS it uses. It should work fine with all mods that don't use UE4SS, notably Pseudo Menu Mod/custom maps and Attire UI Overhaul Mod/custom outfits.
 
+The mod is still in an alpha/prototype phase, and it may have issues or be difficult to set up. In particular, running the server might be complicated for someone who's never done that sort of thing before.
+
 Check out [installing the mod](./installing-the-mod.md) or [running the server](./running-the-server.md) to get started.

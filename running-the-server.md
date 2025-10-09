@@ -1,8 +1,10 @@
 # Running the Server
 
+The mod requires someone to run the server on a computer that is reachable by everyone who will connect. There are many ways to do this. This guide describes setting it up on AWS because that's what I've been using when hosting, but there are definitely other options. However if you don't want to use AWS, you're a bit more on your own (for now).
+
 ## AWS EC2 Instance
 
-This guide will walk you through getting the server running on an AWS EC2 instance. Creating an account is free and you should get some credits when joining which will last for 6 months to a year.
+This guide will walk you through getting the server running on an AWS EC2 instance. Creating an account is free and you should get some credits to cover costs when joining which will last for 6 months to a year.
 
 ### Create Security Group
 
@@ -41,7 +43,7 @@ And now the server is up and running! The instance summary page has a Public IPv
 
 ### Clean Up the Instance
 
-When you're done using the server, cleaning up the instance can help reduce costs.
+When you're done using the server, clean up the instance to help reduce costs.
 
 1. [Optional] End the server process with crtl-C/cmd-C or by entering `/exit`.
 1. On the instance summary page, click Instance state then Terminate (delete) instance.
