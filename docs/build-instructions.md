@@ -34,10 +34,10 @@ To build the `.pak` file for the BP mod, I just cook the assets from the editor 
 
 ### Building the Project
 
-1. Navigate inside the repo and build the project with CMake:
+1. Navigate to `client` and build the project with CMake:
 
     ```cmd
-    pseudoregalia-multiplayer> cmake -S . -B Output
+    client> cmake -S . -B Output
     ```
 
     The solution file will be built to `client/Output/client.sln`. You can open the solution in Visual Studio to make edits, but you will build with the build tools.
