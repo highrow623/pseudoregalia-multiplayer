@@ -8,6 +8,8 @@
 
 #include "toml++/toml.hpp"
 
+#include <Unreal/FString.hpp>
+
 #include "Logger.hpp"
 
 namespace
@@ -24,6 +26,10 @@ namespace
     std::string address = "127.0.0.1";
     std::string port = "23432";
     std::array<uint8_t, 3> color = { 0x00, 0x7f, 0xff };
+	std::string name = "Sybil";
+
+
+	RC::Unreal::FString FStrName = RC::Unreal::FString(ToWide(name).c_str());
 }
 
 void Settings::Load()
@@ -54,6 +60,7 @@ void Settings::Load()
     ParseSetting(address, settings_table, "server.address");
     ParseSetting(port, settings_table, "server.port");
     ParseSetting(color, settings_table, "sybil.color");
+    ParseSetting(name, settings_table, "sybil.name");
 }
 
 const std::string& Settings::GetAddress()
@@ -69,6 +76,16 @@ const std::string& Settings::GetPort()
 const std::array<uint8_t, 3>& Settings::GetColor()
 {
     return color;
+}
+
+const RC::Unreal::FString & Settings::GetName()
+{
+    return FStrName;
+}
+
+const std::string & Settings::GetNameStr()
+{
+    return name;
 }
 
 namespace

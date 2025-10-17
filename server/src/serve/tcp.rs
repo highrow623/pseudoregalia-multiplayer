@@ -68,10 +68,17 @@ async fn receive_connection(
     let mut ws_stream = tokio_tungstenite::accept_async(raw_stream)
         .await
         .map_err(|e| format!("error during WebSocket handshake occured: {e}"))?;
-    let color = receive_connect_message(&mut ws_stream)
+    //let color = receive_connect_message(&mut ws_stream)
+    //    .await
+    //    .map_err(|e| format!("failed to receive connect message: {e}"))?;
+
+   
+    let (color, name) = receive_connect_message(&mut ws_stream)
         .await
         .map_err(|e| format!("failed to receive connect message: {e}"))?;
-    let (id, rx, players) = state.lock().unwrap().connect(color).ok_or("server full".to_owned())?;
+		
+	
+    let (id, rx, players) = state.lock().unwrap().connect(color, name).ok_or("server full".to_owned())?;
     let mut connection = Connection { ws_stream, id, rx, state };
 
     let msg = ServerMessage::Connected { id, players };
@@ -86,7 +93,7 @@ async fn receive_connection(
 
 async fn receive_connect_message(
     ws_stream: &mut WebSocketStream<TcpStream>,
-) -> Result<[u8; 3], String> {
+) -> Result<([u8; 3], String), String> {
     loop {
         // Validate message
         let Some(msg) = ws_stream.next().await else {
@@ -106,7 +113,7 @@ async fn receive_connect_message(
             .map_err(|e| format!("failed to deserialize message: {e}"))?;
 
         return match msg {
-            ClientMessage::Connect { color } => Ok(color),
+            ClientMessage::Connect { color, name } => Ok((color, name)),
         };
     }
 }

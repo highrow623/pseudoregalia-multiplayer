@@ -10,3 +10,6 @@ port = "23432"
 
 # RGB hex code; the color your ghost will appear to other players.
 color = "007fff"
+
+# Name; The name you appear as ingame to other playerd
+name = "Sybil"

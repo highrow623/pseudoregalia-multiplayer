@@ -2,6 +2,7 @@
 
 #include <array>
 #include <string>
+#include <Unreal/FString.hpp>
 
 namespace Settings
 {
@@ -9,4 +10,6 @@ namespace Settings
     const std::string& GetAddress();
     const std::string& GetPort();
     const std::array<uint8_t, 3>& GetColor();
+    const RC::Unreal::FString& GetName();
+    const std::string& GetNameStr();
 }
