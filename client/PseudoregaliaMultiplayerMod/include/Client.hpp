@@ -8,6 +8,7 @@
 
 namespace Client
 {
+
     void OnSceneLoad(std::wstring);
     void Tick();
     uint32_t SetPlayerInfo(const FST_PlayerInfo&);

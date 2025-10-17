@@ -8,7 +8,6 @@
 
 #include "toml++/toml.hpp"
 
-#include <Unreal/FString.hpp>
 
 #include "Logger.hpp"
 
@@ -29,7 +28,6 @@ namespace
 	std::string name = "Sybil";
 
 
-	RC::Unreal::FString FStrName = RC::Unreal::FString(ToWide(name).c_str());
 }
 
 void Settings::Load()
@@ -78,10 +76,7 @@ const std::array<uint8_t, 3>& Settings::GetColor()
     return color;
 }
 
-const RC::Unreal::FString & Settings::GetName()
-{
-    return FStrName;
-}
+
 
 const std::string & Settings::GetNameStr()
 {

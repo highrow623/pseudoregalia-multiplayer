@@ -21,6 +21,47 @@
 
 #include <Unreal/FString.hpp>
 
+#include <PropertyHelpers.hpp>
+
+
+/*
+// My custom ACharacter class for my test game.
+// This exists in the game already as part of the FirstPersonShooter UE template.
+// It's recreated as a C++ class here as part of a C++ mod just
+// to get access to it since obviously it's not supplied by UE4SS, and it's
+// a decent example to use for this feature.
+class FSTT_PlayerInfo : public AActor
+{
+private:
+    DECLARE_EXTERNAL_OBJECT_CLASS(FST_PlayerInfo, ST_PlayerInfo)
+
+public:
+    // First param to the macro is the type.
+    // The second param is the exact name of the property, this is allowed to include spaces.
+    DEFINE_PROPERTY(double*, location_x);
+    DEFINE_PROPERTY(double*, location_y);
+    DEFINE_PROPERTY(double*, location_z);
+    DEFINE_PROPERTY(RC::Unreal::FString*, name);
+    DEFINE_PROPERTY(uint8_t*, id);
+    DEFINE_PROPERTY(uint8_t*, red);
+    DEFINE_PROPERTY(uint8_t*, green);
+    DEFINE_PROPERTY(uint8_t*, blue);
+
+    // If the property has a space in the name, a third param must be passed to the macro that
+    // defines the property without any spaces.
+    //DEFINE_PROPERTY(FName, Property With Space In Name, PropertyWithSpaceInName);
+
+    void TestFunction()
+    {
+        RC::Output::send(STR("Mesh1P: {}\n"), Mesh1P()->GetFullName());
+        RC::Output::send(STR("Name: {}\n"), PropertyWithSpaceInName().ToString());
+    }
+};
+*/
+
+
+
+
 namespace
 {
     const size_t STATE_LEN = 24;

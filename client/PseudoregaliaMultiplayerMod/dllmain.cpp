@@ -18,7 +18,7 @@ public:
     PseudoregaliaMultiplayerMod() : CppUserModBase()
     {
         ModName = STR("PseudoregaliaMultiplayerMod");
-        ModVersion = STR("1.0");
+        ModVersion = STR("1.1");
         ModDescription = STR("Multiplayer mod for Pseudoregalia");
         ModAuthors = STR("highrow623");
         // Do not change this unless you want to target a UE4SS version
