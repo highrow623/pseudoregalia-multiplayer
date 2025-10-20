@@ -20,46 +20,20 @@
 #include "UdpSocket.hpp"
 
 #include <Unreal/FString.hpp>
-
-#include <PropertyHelpers.hpp>
-
-
-/*
-// My custom ACharacter class for my test game.
-// This exists in the game already as part of the FirstPersonShooter UE template.
-// It's recreated as a C++ class here as part of a C++ mod just
-// to get access to it since obviously it's not supplied by UE4SS, and it's
-// a decent example to use for this feature.
-class FSTT_PlayerInfo : public AActor
-{
-private:
-    DECLARE_EXTERNAL_OBJECT_CLASS(FST_PlayerInfo, ST_PlayerInfo)
-
-public:
-    // First param to the macro is the type.
-    // The second param is the exact name of the property, this is allowed to include spaces.
-    DEFINE_PROPERTY(double*, location_x);
-    DEFINE_PROPERTY(double*, location_y);
-    DEFINE_PROPERTY(double*, location_z);
-    DEFINE_PROPERTY(RC::Unreal::FString*, name);
-    DEFINE_PROPERTY(uint8_t*, id);
-    DEFINE_PROPERTY(uint8_t*, red);
-    DEFINE_PROPERTY(uint8_t*, green);
-    DEFINE_PROPERTY(uint8_t*, blue);
-
-    // If the property has a space in the name, a third param must be passed to the macro that
-    // defines the property without any spaces.
-    //DEFINE_PROPERTY(FName, Property With Space In Name, PropertyWithSpaceInName);
-
-    void TestFunction()
-    {
-        RC::Output::send(STR("Mesh1P: {}\n"), Mesh1P()->GetFullName());
-        RC::Output::send(STR("Name: {}\n"), PropertyWithSpaceInName().ToString());
-    }
-};
-*/
+#include <Unreal/UStruct.hpp>
 
 
+#include <format>
+
+#include <Unreal/Property/FArrayProperty.hpp>
+#pragma warning(default : 4005)
+
+
+
+#include <UnrealDef.hpp>
+
+
+using namespace RC;
 
 
 namespace
@@ -83,8 +57,8 @@ namespace
     std::wstring ToWide(const std::string&);
     uint32_t HashW(const std::wstring&);
 
-    RC::Unreal::FString ToFString(const std::string& input);
-    RC::Unreal::FString ToFString(const std::wstring& input);
+    Unreal::FString ToFString(const std::string& input);
+    Unreal::FString ToFString(const std::wstring& input);
 
 
     typedef std::chrono::steady_clock::time_point steady_time_point;
@@ -129,7 +103,7 @@ namespace
     {
         uint8_t id = 0;
         std::array<uint8_t, 3> color{};
-        RC::Unreal::FString name;
+        Unreal::FString name;
 
         std::list<State> states;
 
@@ -394,11 +368,18 @@ uint32_t Client::SetPlayerInfo(const FST_PlayerInfo& info)
     }
 }
 
+
 void Client::GetGhostInfo(
     const uint32_t& millis,
-    RC::Unreal::TArray<FST_PlayerInfo>& ghost_info,
-    RC::Unreal::TArray<uint8_t>& to_remove
+    Unreal::FScriptArray&  ghost_info,
+    Unreal::TArray<uint8_t>& to_remove
 ) {
+
+    //<FST_PlayerInfo>&
+
+    auto& ghost_info_interp = *reinterpret_cast<TArray<FST_PlayerInfo>*>(&ghost_info);
+
+
     for (auto& [id, ghost] : ghosts)
     {
         const auto& state = ghost.refresh_state(millis);
@@ -407,7 +388,7 @@ void Client::GetGhostInfo(
             continue;
         }
 
-        ghost_info.Add(state->info);
+        ghost_info_interp.Add(state->info);
         spawned_ghosts.insert(id);
     }
 
@@ -587,14 +568,14 @@ std::wstring ToWide(const std::string& input)
     return converter.from_bytes(input);
 }
 
-RC::Unreal::FString ToFString(const std::string& input)
+Unreal::FString ToFString(const std::string& input)
 {
-    return RC::Unreal::FString(ToWide(input).c_str());
+    return Unreal::FString(ToWide(input).c_str());
 }
 
-RC::Unreal::FString ToFString(const std::wstring& input)
+Unreal::FString ToFString(const std::wstring& input)
 {
-    return RC::Unreal::FString(input.c_str());
+    return Unreal::FString(input.c_str());
 }
 
 // Performs the 32-bit FNV-1a hash function on the input wstring.

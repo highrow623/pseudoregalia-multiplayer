@@ -1,3 +1,5 @@
+#pragma once
+
 #include <Unreal/FString.hpp>
 
 #ifndef UE4SS_SDK_ST_PlayerInfo_HPP
