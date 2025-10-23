@@ -15,26 +15,11 @@
 #include "wswrap.hpp"
 #include "nlohmann/json.hpp"
 
+#include "Unreal/FString.hpp"
+
 #include "Logger.hpp"
 #include "Settings.hpp"
 #include "UdpSocket.hpp"
-
-#include <Unreal/FString.hpp>
-#include <Unreal/UStruct.hpp>
-
-
-#include <format>
-
-#include <Unreal/Property/FArrayProperty.hpp>
-#pragma warning(default : 4005)
-
-
-
-#include <UnrealDef.hpp>
-
-
-using namespace RC;
-
 
 namespace
 {
@@ -57,9 +42,7 @@ namespace
     std::wstring ToWide(const std::string&);
     uint32_t HashW(const std::wstring&);
 
-    Unreal::FString ToFString(const std::string& input);
-    Unreal::FString ToFString(const std::wstring& input);
-
+    RC::Unreal::FString ToFString(const std::string& input);
 
     typedef std::chrono::steady_clock::time_point steady_time_point;
     uint32_t MillisSinceStart(const steady_time_point&);
@@ -103,7 +86,7 @@ namespace
     {
         uint8_t id = 0;
         std::array<uint8_t, 3> color{};
-        Unreal::FString name;
+        RC::Unreal::FString name;
 
         std::list<State> states;
 
@@ -140,7 +123,6 @@ namespace
             }
             
             s.info.name = name;
-
             s.info.id = id;
             s.info.red = color[0];
             s.info.green = color[1];
@@ -204,8 +186,10 @@ namespace
 
             // distance from lower as a percentage
             double pct = double(lower_dist) / double(lower_dist + upper_dist);
-            return State{
-                .info = FST_PlayerInfo{
+            return State
+            {
+                .info = FST_PlayerInfo
+                {
                     // interpolate location between lower and upper based on percent
                     .location_x = lower.info.location_x + (upper.info.location_x - lower.info.location_x) * pct,
                     .location_y = lower.info.location_y + (upper.info.location_y - lower.info.location_y) * pct,
@@ -214,9 +198,7 @@ namespace
                     .rotation_x = lower_is_closer ? lower.info.rotation_x : upper.info.rotation_x,
                     .rotation_y = lower_is_closer ? lower.info.rotation_y : upper.info.rotation_y,
                     .rotation_z = lower_is_closer ? lower.info.rotation_z : upper.info.rotation_z,
-                     
                     .name = name,
-
                     .id = id,
                     .red = color[0],
                     .green = color[1],
@@ -371,14 +353,10 @@ uint32_t Client::SetPlayerInfo(const FST_PlayerInfo& info)
 
 void Client::GetGhostInfo(
     const uint32_t& millis,
-    Unreal::FScriptArray&  ghost_info,
-    Unreal::TArray<uint8_t>& to_remove
+    RC::Unreal::FScriptArray& ghost_info_raw,
+    RC::Unreal::TArray<uint8_t>& to_remove
 ) {
-
-    //<FST_PlayerInfo>&
-
-    auto& ghost_info_interp = *reinterpret_cast<TArray<FST_PlayerInfo>*>(&ghost_info);
-
+    auto& ghost_info = *reinterpret_cast<RC::Unreal::TArray<FST_PlayerInfo>*>(&ghost_info_raw);
 
     for (auto& [id, ghost] : ghosts)
     {
@@ -388,7 +366,7 @@ void Client::GetGhostInfo(
             continue;
         }
 
-        ghost_info_interp.Add(state->info);
+        ghost_info.Add(state->info);
         spawned_ghosts.insert(id);
     }
 
@@ -413,11 +391,11 @@ void OnOpen()
 {
     Log(L"WebSocket connection established", LogType::Loud);
     const auto& color = Settings::GetColor();
-    const auto& name = Settings::GetNameStr();
+    const auto& name = Settings::GetName();
     nlohmann::json j = {
         {"type", "Connect"},
         {"color", color},
-		{"name", name},
+        {"name", name},
     };
     ws->send_text(j.dump());
 }
@@ -447,21 +425,21 @@ void OnMessage(const std::string& message)
         auto& field_players = j["players"];
         for (auto it = field_players.begin(); it != field_players.end(); ++it)
         {
-
             auto player_name = (*it)["name"].template get<std::string>();
-
             auto player_id = (*it)["id"].template get<uint8_t>();
 
             const auto& field_color = (*it)["color"];
             auto red = field_color[0].template get<uint8_t>();
             auto green = field_color[1].template get<uint8_t>();
             auto blue = field_color[2].template get<uint8_t>();
-			
-			
-
-            ghosts[player_id] = Ghost{ .id = player_id, .color = { red, green, blue }, .name = ToFString(player_name)  };
+            
+            ghosts[player_id] = Ghost
+            {
+                .id = player_id,
+                .color = { red, green, blue },
+                .name = ToFString(player_name)
+            };
         }
-        
 
         Log(L"Received Connected message with player id " + std::to_wstring(*id), LogType::Loud);
     }
@@ -475,18 +453,17 @@ void OnMessage(const std::string& message)
         }
 
         auto player_name = j["name"].template get<std::string>();
-
         auto player_id = j["id"].template get<uint8_t>();
 
         const auto& field_color = j["color"];
         auto red = field_color[0].template get<uint8_t>();
         auto green = field_color[1].template get<uint8_t>();
         auto blue = field_color[2].template get<uint8_t>();
-		
-
+        
         ghosts[player_id] = Ghost{ .id = player_id, .color = { red, green, blue }, .name = ToFString(player_name)};
 
-        Log(L"Received PlayerJoined message with id " + std::to_wstring(player_id) + L" with name "  + ToWide(player_name), LogType::Loud);
+        Log(L"Received PlayerJoined message with id " + std::to_wstring(player_id) + L" (" + ToWide(player_name) + L")",
+            LogType::Loud);
     }
     else if (field_type == "PlayerLeft")
     {
@@ -568,16 +545,6 @@ std::wstring ToWide(const std::string& input)
     return converter.from_bytes(input);
 }
 
-Unreal::FString ToFString(const std::string& input)
-{
-    return Unreal::FString(ToWide(input).c_str());
-}
-
-Unreal::FString ToFString(const std::wstring& input)
-{
-    return Unreal::FString(input.c_str());
-}
-
 // Performs the 32-bit FNV-1a hash function on the input wstring.
 uint32_t HashW(const std::wstring& str)
 {
@@ -596,6 +563,11 @@ uint32_t HashW(const std::wstring& str)
         result *= 0x01000193; // 32-bit FNV prime
     }
     return result;
+}
+
+RC::Unreal::FString ToFString(const std::string& input)
+{
+    return RC::Unreal::FString(ToWide(input).c_str());
 }
 
 // Serializes src into 1 byte of buf starting at pos and increments pos by 1.

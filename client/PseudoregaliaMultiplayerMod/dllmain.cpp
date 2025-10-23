@@ -1,14 +1,11 @@
 #include <Mod/CppUserModBase.hpp>
 
 #include "Unreal/AActor.hpp"
+#include "Unreal/FScriptArray.hpp"
 #include "Unreal/Hooks.hpp"
 #include "Unreal/UClass.hpp"
 #include "Unreal/UFunction.hpp"
 #include "Unreal/World.hpp"
-#include <Unreal/Property/FArrayProperty.hpp>
-#pragma warning(default : 4005)
-
-#include <UnrealDef.hpp>
 
 #include "Client.hpp"
 #include "Logger.hpp"
@@ -76,8 +73,6 @@ public:
             RC::Unreal::TArray<uint8_t> to_remove;
         };
         auto params = std::make_unique<UpdateGhostsParams>();
-
-        //auto& ghost_info = *reinterpret_cast<FST_PlayerInfo>(&params->ghost_info_raw);
 
         Client::GetGhostInfo(millis, params->ghost_info_raw, params->to_remove);
         if (params->ghost_info_raw.Num() == 0 && params->to_remove.Num() == 0)

@@ -9,5 +9,5 @@ namespace Settings
     const std::string& GetAddress();
     const std::string& GetPort();
     const std::array<uint8_t, 3>& GetColor();
-    const std::string& GetNameStr();
+    const std::string& GetName();
 }

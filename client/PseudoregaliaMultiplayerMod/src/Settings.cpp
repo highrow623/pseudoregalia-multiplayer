@@ -8,7 +8,6 @@
 
 #include "toml++/toml.hpp"
 
-
 #include "Logger.hpp"
 
 namespace
@@ -26,8 +25,6 @@ namespace
     std::string port = "23432";
     std::array<uint8_t, 3> color = { 0x00, 0x7f, 0xff };
 	std::string name = "Sybil";
-
-
 }
 
 void Settings::Load()
@@ -76,9 +73,7 @@ const std::array<uint8_t, 3>& Settings::GetColor()
     return color;
 }
 
-
-
-const std::string & Settings::GetNameStr()
+const std::string & Settings::GetName()
 {
     return name;
 }

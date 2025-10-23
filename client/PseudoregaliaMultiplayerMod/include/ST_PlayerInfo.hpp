@@ -2,10 +2,6 @@
 
 #include <Unreal/FString.hpp>
 
-#ifndef UE4SS_SDK_ST_PlayerInfo_HPP
-#define UE4SS_SDK_ST_PlayerInfo_HPP
-
-
 // the uint8_t fields are at the end for alignment reasons
 struct FST_PlayerInfo
 {
@@ -21,6 +17,3 @@ struct FST_PlayerInfo
     uint8_t green;                    // 0x0042 (size: 0x1)
     uint8_t blue;                     // 0x0043 (size: 0x1)
 }; // Size: 0x44
-
-
-#endif
