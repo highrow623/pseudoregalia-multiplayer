@@ -1,4 +1,4 @@
-use crate::message::{PlayerInfo, ServerMessage};
+use crate::message::{ConnectInfo, PlayerInfo, ServerMessage};
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -29,13 +29,14 @@ impl PlayerState {
 
 struct Player {
     color: [u8; 3],
+    name: String,
     states: BTreeMap<u32, PlayerState>,
     tx: UnboundedSender<ServerMessage>,
 }
 
 impl Player {
-    fn new(color: [u8; 3], tx: UnboundedSender<ServerMessage>) -> Self {
-        Self { color, states: BTreeMap::new(), tx }
+    fn new(color: [u8; 3], name: String, tx: UnboundedSender<ServerMessage>) -> Self {
+        Self { color, name, states: BTreeMap::new(), tx }
     }
 
     fn update(&mut self, millis: u32, player_state: PlayerState) {
@@ -72,7 +73,7 @@ impl State {
 
     pub fn connect(
         &mut self,
-        color: [u8; 3],
+        info: ConnectInfo,
     ) -> Option<(u8, UnboundedReceiver<ServerMessage>, Vec<PlayerInfo>)> {
         if self.players.len() == MAX_PLAYERS {
             return None;
@@ -89,14 +90,22 @@ impl State {
         // create list of other players' ids while informing other players of this new connection
         let mut players = Vec::with_capacity(self.players.len());
         for (player_id, player) in &self.players {
-            players.push(PlayerInfo { id: *player_id, color: player.color });
+            players.push(PlayerInfo {
+                id: *player_id,
+                color: player.color,
+                name: player.name.clone(),
+            });
             // if the corresponding rx has been dropped, it doesn't matter that this message won't
             // get read, so we can ignore the error
-            let _ = player.tx.send(ServerMessage::PlayerJoined { id, color });
+            let _ = player.tx.send(ServerMessage::PlayerJoined {
+                id,
+                color: info.color,
+                name: info.name.clone(),
+            });
         }
 
         let (tx, rx) = mpsc::unbounded_channel();
-        self.players.insert(id, Player::new(color, tx));
+        self.players.insert(id, Player::new(info.color, info.name, tx));
 
         Some((id, rx, players))
     }

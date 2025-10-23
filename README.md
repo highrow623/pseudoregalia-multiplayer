@@ -9,3 +9,8 @@ The mod uses UE4SS and was built to be compatible with [`pseudoregalia-archipela
 The mod is still in an alpha/prototype phase, and it may have issues or be difficult to set up. In particular, running the server might be complicated for someone who's never done that sort of thing before.
 
 Check out [installing the mod](./installing-the-mod.md) or [running the server](./running-the-server.md) to get started.
+
+## Contributors
+
+* [Crash](https://github.com/KidoHyde)
+  * Implemented name tags

@@ -10,3 +10,6 @@ port = "23432"
 
 # RGB hex code; the color your ghost will appear to other players.
 color = "007fff"
+
+# Your name, which will appear above your ghost's head to other players.
+name = "Sybil"
