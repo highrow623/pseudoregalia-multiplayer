@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 pub struct PlayerInfo {
     pub id: u8,
     pub color: [u8; 3],
-	pub name: String,
+    pub name: String,
 }
 
 #[derive(Serialize)]
@@ -16,7 +16,13 @@ pub enum ServerMessage {
 }
 
 #[derive(Deserialize)]
+pub struct ConnectInfo {
+    pub color: [u8; 3],
+    pub name: String,
+}
+
+#[derive(Deserialize)]
 #[serde(tag = "type")]
 pub enum ClientMessage {
-    Connect { color: [u8; 3], name: String },
+    Connect(ConnectInfo),
 }

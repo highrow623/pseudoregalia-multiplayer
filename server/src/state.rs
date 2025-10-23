@@ -1,4 +1,4 @@
-use crate::message::{PlayerInfo, ServerMessage};
+use crate::message::{ConnectInfo, PlayerInfo, ServerMessage};
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -73,8 +73,7 @@ impl State {
 
     pub fn connect(
         &mut self,
-        color: [u8; 3],
-        name: String,
+        info: ConnectInfo,
     ) -> Option<(u8, UnboundedReceiver<ServerMessage>, Vec<PlayerInfo>)> {
         if self.players.len() == MAX_PLAYERS {
             return None;
@@ -91,14 +90,22 @@ impl State {
         // create list of other players' ids while informing other players of this new connection
         let mut players = Vec::with_capacity(self.players.len());
         for (player_id, player) in &self.players {
-            players.push(PlayerInfo { id: *player_id, color: player.color, name: player.name.clone() });
+            players.push(PlayerInfo {
+                id: *player_id,
+                color: player.color,
+                name: player.name.clone(),
+            });
             // if the corresponding rx has been dropped, it doesn't matter that this message won't
             // get read, so we can ignore the error
-            let _ = player.tx.send(ServerMessage::PlayerJoined { id, color, name: name.clone() });
+            let _ = player.tx.send(ServerMessage::PlayerJoined {
+                id,
+                color: info.color,
+                name: info.name.clone(),
+            });
         }
 
         let (tx, rx) = mpsc::unbounded_channel();
-        self.players.insert(id, Player::new(color, name, tx));
+        self.players.insert(id, Player::new(info.color, info.name, tx));
 
         Some((id, rx, players))
     }
