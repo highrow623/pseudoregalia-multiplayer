@@ -63,6 +63,7 @@ The settings file has these options:
 | `server.address` | string | The address of the server to connect to. Can be an IP address or a domain. | `"127.0.0.1"` |
 | `server.port` | string | The port number the server is running on. | `"23432"` |
 | `sybil.color` | RGB hex code (string) | The color your ghost will appear to other players. | `"007fff"` |
+| `sybil.name` | string | Your name, which will appear above your ghost's head to other players. | `"Sybil"` |
 
 The settings file is only read when you start Pseudoregalia. If you need to change them, you'll need to quit out and restart the game for the new settings to take effect.
 

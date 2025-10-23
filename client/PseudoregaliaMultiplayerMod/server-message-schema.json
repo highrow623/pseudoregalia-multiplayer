@@ -17,9 +17,12 @@
       "type": "object",
       "properties": {
         "id": { "$ref": "#/$defs/u8" },
-        "color": { "$ref": "#/$defs/color" }
+        "color": { "$ref": "#/$defs/color" },
+        "name": {
+          "type": "string"
+        }
       },
-      "required": ["id", "color"],
+      "required": ["id", "color", "name"],
       "additionalProperties": false
     },
     "message": {
@@ -39,9 +42,12 @@
         "properties": {
           "type": {},
           "id": { "$ref": "#/$defs/u8" },
-          "color": { "$ref": "#/$defs/color" }
+          "color": { "$ref": "#/$defs/color" },
+          "name": {
+            "type": "string"
+          }
         },
-        "required": ["id", "color"],
+        "required": ["id", "color", "name"],
         "additionalProperties": false
       },
       "playerLeft": {
