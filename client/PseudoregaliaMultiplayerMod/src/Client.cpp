@@ -87,7 +87,6 @@ namespace
         uint8_t id = 0;
         std::array<uint8_t, 3> color{};
         RC::Unreal::FString name;
-
         std::list<State> states;
 
         // offsets provide a way to figure out syncing. the offset is meant to guess at how far off a player's
@@ -349,7 +348,6 @@ uint32_t Client::SetPlayerInfo(const FST_PlayerInfo& info)
         return 0u;
     }
 }
-
 
 void Client::GetGhostInfo(
     const uint32_t& millis,

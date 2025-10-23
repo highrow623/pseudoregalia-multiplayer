@@ -73,7 +73,6 @@ public:
             RC::Unreal::TArray<uint8_t> to_remove;
         };
         auto params = std::make_unique<UpdateGhostsParams>();
-
         Client::GetGhostInfo(millis, params->ghost_info_raw, params->to_remove);
         if (params->ghost_info_raw.Num() == 0 && params->to_remove.Num() == 0)
         {
