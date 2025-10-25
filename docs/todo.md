@@ -10,7 +10,7 @@
   * reuse animation bp and/or player controller, sync whatever data is needed for animations
   * make new animation bp
 * also send dream breaker? or at least attach it to ghost sybil when that player is holding it
-* name tags or some ui to say who is connected and which level they are in
+* add some ui to say who is connected and which level they are in?
 * add compression and ssl?
 * improve setting connect uri, make it runtime configurable?
 * do some graceful shutdown when the `/exit` command is executed, ie close all active connections before ending the program
