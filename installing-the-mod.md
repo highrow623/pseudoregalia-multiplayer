@@ -20,15 +20,9 @@ If you have `pseudoregalia-archipelago` installed, then you already have the ver
 
 1. Extract the zip directly into the `Pseudoregalia` folder. If you did it correctly, you should see a file in this location: `Pseudoregalia/pseudoregalia/Content/Paks/LogicMods/PseudoregaliaMultiplayerMod.pak`.
 
-1. Open `Pseudoregalia/pseudoregalia/Binaries/Win64/Mods/mods.txt` and add a new line with this text:
-
-   ```
-   PseudoregaliaMultiplayerMod : 1
-   ```
-
 ## Cleaning Up UE4SS
 
-`pseudoregalia-multiplayer` was built for a specific, older version of UE4SS, so it might not be compatible with the version you have installed. The safest way to make sure the mod will work is to create a new folder and install the mod fresh.
+`pseudoregalia-multiplayer` was built for a specific version of UE4SS, so it might not be compatible with the version you have installed. The safest way to make sure the mod will work is to create a new folder and install the mod fresh.
 
 1. Go to Steam, right click the Pseudoregalia game, and navigate to Manage > Browse local files. This will put you *into* the `Pseudoregalia` folder.
 
@@ -54,7 +48,7 @@ If you have `pseudoregalia-archipelago` installed, then you already have the ver
 
 ## Configuring the Client
 
-Releases include a template settings file at `Pseudoregalia/pseudoregalia/Binaries/Win64/Mods/PseudoregaliaMultiplayerMod/settings.tmpl.toml`. Rename it to `settings.toml` for the settings to actually be used. *Note: the settings file is in a template in releases so that when you update the mod, it won't overwrite your current settings. You can check the template file after installing a new release to see if there is anything new.*
+Releases include a template settings file at `Pseudoregalia/pseudoregalia/Binaries/Win64/ue4ss/Mods/PseudoregaliaMultiplayerMod/settings.tmpl.toml`. Rename it to `settings.toml` for the settings to actually be used. *Note: the settings file is in a template in releases so that when you update the mod, it won't overwrite your current settings. You can check the template file after installing a new release to see if there is anything new.*
 
 The settings file has these options:
 
@@ -73,6 +67,6 @@ If you want to turn off the mod without removing UE4SS, do the following:
 
 1. Remove `Pseudoregalia/pseudoregalia/Content/Paks/LogicMods/PseudoregaliaMultiplayerMod.pak`. You may want to copy it to another location in case you decide to reinstall later.
 
-1. Open `Pseudoregalia/pseudoregalia/Binaries/Win64/Mods/mods.txt` and change the number after `PseudoregaliaMultiplayerMod` from `1` to `0`.
+1. Remove `Pseudoregalia/pseudoregalia/Binaries/Win64/ue4ss/Mods/PseudoregaliaMultiplayerMod/enabled.txt`. (The file is empty but its existence tells UE4SS to load the mod.)
 
 To uninstall the mod and UE4SS, see the [cleaning up UE4SS](#cleaning-up-ue4ss) section. If you copied the `Pseudoregalia` folder specifically for this mod, you can just delete the folder.

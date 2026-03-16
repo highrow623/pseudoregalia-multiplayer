@@ -1,10 +1,9 @@
 #include <Mod/CppUserModBase.hpp>
 
 #include "Unreal/AActor.hpp"
-#include "Unreal/FScriptArray.hpp"
+#include "Unreal/Core/Containers/ScriptArray.hpp"
 #include "Unreal/Hooks.hpp"
-#include "Unreal/UClass.hpp"
-#include "Unreal/UFunction.hpp"
+#include "Unreal/CoreUObject/UObject/Class.hpp"
 #include "Unreal/World.hpp"
 
 #include "Client.hpp"
@@ -35,26 +34,32 @@ public:
 
     auto on_unreal_init() -> void override
     {
-        RC::Unreal::Hook::RegisterBeginPlayPostCallback([&](RC::Unreal::AActor* actor)
-        {
-            if (actor->GetClassPrivate()->GetName() == L"BP_PM_Manager_C")
+        RC::Unreal::Hook::RegisterBeginPlayPostCallback(
+            [&](RC::Unreal::Hook::TCallbackIterationData<void>& cb_data, RC::Unreal::AActor* actor)
             {
-                Client::OnSceneLoad(actor->GetWorld()->GetName());
-
-                if (!sync_items_hooked)
+                if (actor->GetClassPrivate()->GetName() == L"BP_PM_Manager_C")
                 {
-                    RC::Unreal::UFunction* func = actor->GetFunctionByName(L"SyncInfo");
-                    if (!func)
+                    Client::OnSceneLoad(actor->GetWorld()->GetName());
+
+                    if (!sync_items_hooked)
                     {
-                        Log(L"Could not find function \"SyncInfo\" in \"BP_PM_Manager_C\"", LogType::Error);
-                        return;
+                        RC::Unreal::UFunction* func = actor->GetFunctionByName(L"SyncInfo");
+                        if (!func)
+                        {
+                            Log(L"Could not find function \"SyncInfo\" in \"BP_PM_Manager_C\"", LogType::Error);
+                            return;
+                        }
+                        RC::Unreal::UObjectGlobals::RegisterHook(func, sync_info, nop, nullptr);
+                        Log(L"Registered hook for \"SyncInfo\" in \"BP_PM_Manager_C\"", LogType::Loud);
+                        sync_items_hooked = true;
                     }
-                    RC::Unreal::UObjectGlobals::RegisterHook(func, sync_info, nop, nullptr);
-                    Log(L"Registered hook for \"SyncInfo\" in \"BP_PM_Manager_C\"", LogType::Loud);
-                    sync_items_hooked = true;
                 }
+            },
+            RC::Unreal::Hook::FCallbackOptions{
+                .OwnerModName = L"PseudoregaliaMultiplayerMod",
+                .HookName = L"BeginPlayPost",
             }
-        });
+        );
     }
 
     auto on_update() -> void override
