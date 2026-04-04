@@ -17,7 +17,7 @@ namespace
     std::wstring ToWide(const std::string&);
 
     // if you run from the executable directory
-    const std::string settings_filename1 = "Mods/PseudoregaliaMultiplayerMod/settings.toml";
+    const std::string settings_filename1 = "ue4ss/Mods/PseudoregaliaMultiplayerMod/settings.toml";
     // if you run from the game directory
     const std::string settings_filename2 = "pseudoregalia/Binaries/Win64/" + settings_filename1;
 
